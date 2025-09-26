@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "IMPORTANT: Always use utils/contractLoader.ts for contract interactions",
     "scripts": {
-        "build": "cp ../contracts/deployment.json . && cp -r ../contracts/out .",
+        "build": "cp contracts/deployment.json scripts/ && cp -r contracts/out scripts/",
         "start": "ts-node minimalOracle.ts",
         "purchase-policy": "ts-node purchasePolicy.ts",
         "claim-policy": "ts-node claimPolicy.ts",
