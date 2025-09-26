@@ -1,203 +1,222 @@
-import dotenv from "dotenv";
+import { buildPoseidon } from "circomlibjs";
+import * as crypto from "crypto";
+import * as dotenv from "dotenv";
 import { ethers } from "ethers";
-import * as fs from "fs/promises";
-import { loadContractABI, loadDeploymentAddresses } from "./utils/contractLoader";
+import * as fs from "fs";
+import * as fsPromises from "fs/promises";
+import * as path from "path";
+import { InvoiceData, PurchaseDetails, TierBoundary } from "./types";
+import { getContractInstance, loadDeploymentAddresses } from "./utils/contractLoader";
+
 dotenv.config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const RPC_URL = process.env.RPC_URL || "http://localhost:8545";
+// Load invoice data from JSON file
+const INVOICE_FILE_PATH = "./invoice.json";
 
-async function purchasePolicy() {
-  console.log("\n=== ZK NOTES: STEP 2 - POLICY PURCHASE ===");
-  console.log("🔐 This file reads commitment-data.json from Step 1 and submits to contract:");
-  console.log("  ├─ Contract: Stores commitment hash in Policy struct mapping");
-  console.log("  ├─ ZK Purpose: Commitment will be used to verify proof without revealing invoice");
-  console.log(
-    "  └─ Chronological Order: [1st] Generate commitment → [2nd] Purchase policy ← HERE → [3rd] Generate proof → [4th] Claim payout"
-  );
-  console.log("\n🧮 Key ZK Features Used:");
-  console.log("  • Commitment Storage: Secret hash stored on-chain for later proof verification");
-  console.log("  • Policy ID: Simple counter (not NFT), links commitment to buyer");
-  console.log("  • Tiered Premium: Three tiers (<$500, $500-1000, >$1000) with dynamic pricing");
-  console.log("  • Coverage: 100% of price difference (unlimited upside, speculative model)");
-  console.log("  • No Invoice Data: Only commitment hash goes on-chain, preserving privacy");
-  console.log("  • Dynamic Factor: Premium increases with demand (1% per 10 policies)");
+function loadInvoiceData(): InvoiceData {
+  try {
+    return JSON.parse(fs.readFileSync(INVOICE_FILE_PATH, "utf8"));
+  } catch (error) {
+    throw new Error(`Failed to load invoice data from ${INVOICE_FILE_PATH}`);
+  }
+}
+
+// Premium tiers (must match circuit lines 67-71 and contract lines 30-34)
+const TIER_BOUNDARIES: TierBoundary[] = [
+  { min: BigInt(1000000), max: BigInt(99999999), tier: 1, premium: BigInt(1000000) }, // $1-99.99 → $1
+  { min: BigInt(100000000), max: BigInt(499000000), tier: 2, premium: BigInt(3000000) }, // $100-499 → $3
+  { min: BigInt(500000000), max: BigInt(999000000), tier: 3, premium: BigInt(7000000) }, // $500-999 → $7
+  { min: BigInt(1000000000), max: BigInt(1999000000), tier: 4, premium: BigInt(13000000) }, // $1000-1999 → $13
+  { min: BigInt(2000000000), max: BigInt(10000000000), tier: 5, premium: BigInt(20000000) }, // $2000-10000 → $20
+];
+
+async function validateEnvironment(): Promise<void> {
+  if (!process.env.USER_PRIVATE_KEY) throw new Error("USER_PRIVATE_KEY environment variable required");
+  if (!process.env.RPC_URL) throw new Error("RPC_URL environment variable required");
 
   try {
-    // Load deployment addresses
+    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    await provider.getNetwork();
+    await fsPromises.access("../contracts/deployment.json");
+  } catch (error) {
+    throw new Error(`Environment validation failed: ${error}`);
+  }
+}
+
+async function collectPurchaseDetails(poseidon: any, invoiceData: InvoiceData): Promise<PurchaseDetails> {
+  const { orderNumber, purchasePriceUsd, purchaseDate, productId } = invoiceData;
+  console.log(`Purchase: ${orderNumber} | $${purchasePriceUsd} | ${purchaseDate} | ${productId}`);
+
+  const orderHash = ethers.keccak256(ethers.toUtf8Bytes(orderNumber));
+  const invoicePrice = BigInt(Number(purchasePriceUsd) * 1000000);
+  const invoiceDate = Math.floor(new Date(purchaseDate).getTime() / 1000);
+
+  const productIdBytes = ethers.toUtf8Bytes(productId);
+  const productIdHash = ethers.keccak256(productIdBytes);
+  const productHashBigInt = BigInt(productIdHash);
+  const productHashField = poseidon([productHashBigInt]);
+  const productHash = poseidon.F.toObject(productHashField);
+
+  const salt = BigInt("0x" + crypto.randomBytes(32).toString("hex"));
+  const { tier } = calculateTierAndPremium(invoicePrice);
+
+  return {
+    orderHash,
+    invoicePrice,
+    invoiceDate,
+    productHash,
+    salt,
+    selectedTier: tier,
+  };
+}
+
+function generateCommitment(poseidon: any, details: PurchaseDetails): bigint {
+  // Create commitment hash (must match circuit line 41-48)
+  const commitment = poseidon([
+    BigInt(details.orderHash),
+    details.invoicePrice,
+    BigInt(details.invoiceDate),
+    details.productHash,
+    details.salt,
+    BigInt(details.selectedTier),
+  ]);
+
+  return poseidon.F.toObject(commitment);
+}
+
+function calculateTierAndPremium(invoicePrice: bigint): { tier: number; premium: bigint } {
+  for (const boundary of TIER_BOUNDARIES) {
+    if (invoicePrice >= boundary.min && invoicePrice <= boundary.max) {
+      return {
+        tier: boundary.tier,
+        premium: boundary.premium,
+      };
+    }
+  }
+  throw new Error(`Invoice price ${invoicePrice} outside valid tier ranges`);
+}
+
+async function main(): Promise<void> {
+  try {
+    console.log("Validating environment...");
+    await validateEnvironment();
+
+    console.log("Initializing Poseidon hasher...");
+    const poseidon = await buildPoseidon();
+    const invoiceData = loadInvoiceData();
+
+    console.log("\nGenerating Purchase Commitment");
+    const purchaseDetails = await collectPurchaseDetails(poseidon, invoiceData);
+    const secretCommitment = generateCommitment(poseidon, purchaseDetails);
+    console.log(`Secret commitment: ${secretCommitment}`);
+
+    const policyDataDir = path.join(__dirname, "../policy-data");
+    try {
+      await fsPromises.access(policyDataDir);
+    } catch {
+      await fsPromises.mkdir(policyDataDir, { recursive: true });
+    }
+
+    const commitmentData = {
+      ...purchaseDetails,
+      orderHash: purchaseDetails.orderHash,
+      invoicePrice: purchaseDetails.invoicePrice.toString(),
+      productHash: purchaseDetails.productHash.toString(),
+      salt: purchaseDetails.salt.toString(),
+      secretCommitment: secretCommitment.toString(),
+      timestamp: Date.now(),
+    };
+    await fsPromises.writeFile(path.join(policyDataDir, `commitment.json`), JSON.stringify(commitmentData, null, 2));
+
+    const { tier, premium } = calculateTierAndPremium(purchaseDetails.invoicePrice);
+    if (purchaseDetails.selectedTier !== tier) {
+      throw new Error(`Selected tier ${purchaseDetails.selectedTier} doesn't match calculated tier ${tier}`);
+    }
+    console.log(`Tier ${tier} | Price: $${Number(purchaseDetails.invoicePrice) / 1000000} | Premium: $${Number(premium) / 1000000}`);
+
     const deployment = await loadDeploymentAddresses();
-    const CONTRACT_ADDRESS = deployment.oracle;
+    if (!deployment.vault || !deployment.token) throw new Error("Missing vault or token address in deployment");
 
-    if (!CONTRACT_ADDRESS) {
-      throw new Error("Contract address not found in deployment.json or environment variables");
-    }
+    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    const signer = new ethers.Wallet(process.env.USER_PRIVATE_KEY!, provider);
+    const vault = await getContractInstance("InsuranceVault", deployment.vault, signer);
+    const token = await getContractInstance("Token", deployment.token, signer);
 
-    // Load commitment data
-    console.log("\n📖 Loading commitment data from Step 1...");
-    const commitmentDataRaw = await fs.readFile("commitment-data.json", "utf-8");
-    const commitmentData = JSON.parse(commitmentDataRaw);
-    console.log("  • Commitment (Poseidon hash):", commitmentData.commitment);
-    console.log("  • Product ID:", commitmentData.productId);
-    console.log("  • Selected Tier:", commitmentData.selectedTier);
-    console.log("  • This commitment = Poseidon(orderHash, invoicePrice, invoiceDate, productHash, salt, tier)");
-    console.log("  • Circuit will later prove knowledge of these values and tier validation");
+    console.log(`Contracts | Vault: ${deployment.vault} | Token: ${deployment.token}`);
 
-    // Load contract ABI and connect
-    const contractABI = await loadContractABI("PriceProtectionOracle");
-    const tokenABI = await loadContractABI("Token");
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, wallet);
-    let currentnonce;
-    // Get token address from the contract's paymentToken field
-    const TOKEN_ADDRESS = await contract.paymentToken();
-    console.log("  • Payment Token Address:", TOKEN_ADDRESS);
-
-    const tokenContract = new ethers.Contract(TOKEN_ADDRESS, tokenABI, wallet);
-
-    // Get current quote from contract
-    console.log("\n📊 Getting current tier premiums from contract...");
-    const quote = await contract.getQuote();
-    console.log("  • Tier 1 (<$500): $", ethers.formatUnits(quote.tier1Premium, 6));
-    console.log("  • Tier 2 ($500-1000): $", ethers.formatUnits(quote.tier2Premium, 6));
-    console.log("  • Tier 3 (>$1000): $", ethers.formatUnits(quote.tier3Premium, 6));
-    console.log("  • Dynamic Factor:", quote.currentDynamicFactor.toString() + "%");
-    console.log("  • Current Policy Count:", quote.currentPolicyCount.toString());
-
-    // PRIVACY: Extract data but don't send to chain
-    const productId = commitmentData.productId;
-    const purchasePrice = BigInt(commitmentData.invoicePrice); // Price in 6 decimals (USDC format)
-    const selectedTier = commitmentData.selectedTier;
-
-    // Select appropriate premium based on tier
-    let premium;
-    if (selectedTier === 1) {
-      premium = quote.tier1Premium;
-      console.log("\n💰 Using Tier 1 premium for items < $500");
-    } else if (selectedTier === 2) {
-      premium = quote.tier2Premium;
-      console.log("\n💰 Using Tier 2 premium for items $500-$1000");
-    } else {
-      premium = quote.tier3Premium;
-      console.log("\n💰 Using Tier 3 premium for items > $1000");
-    }
-
-    // Check existing allowance before approving
-    const approveAmount = ethers.parseUnits("1000", 6);
-    const currentAllowance = await tokenContract.allowance(wallet.address, CONTRACT_ADDRESS);
-
-    let nextNonce;
-    if (currentAllowance < approveAmount) {
-      console.log("  • Approving contract to spend premium amount...");
-      currentnonce = await provider.getTransactionCount(wallet.address);
-      console.log("  • Current Nonce:", currentnonce);
-      const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, approveAmount, { nonce: currentnonce });
-      console.log("  • Approval transaction:", approveTx.hash);
-      // Manually increment nonce for next transaction since approval tx is pending
-      nextNonce = currentnonce + 1;
-      console.log("  • Next Nonce (incremented):", nextNonce);
-      console.log("  • ✅ Contract approved to spend", ethers.formatUnits(approveAmount, 6), "MockUSDC");
-    } else {
-      console.log("  • ✅ Contract already approved to spend", ethers.formatUnits(currentAllowance, 6), "MockUSDC (skipping approval)");
-      // Get current nonce since we didn't send approval
-      nextNonce = await provider.getTransactionCount(wallet.address);
-    }
-    console.log("\n📊 Premium Selection:");
-    console.log("  • Purchase Price: $" + ethers.formatUnits(purchasePrice, 6) + " (kept private)");
-    console.log("  • Selected Tier:", selectedTier);
-    console.log("  • Premium Amount: $" + ethers.formatUnits(premium, 6));
-    console.log("  • PRIVACY: Exact price hidden, only tier revealed through premium");
-    console.log("  • SPECULATIVE MODEL: Pay fixed tier premium, claim 100% of price drop");
-
-    // Check user's token balance
-    const userBalance = await tokenContract.balanceOf(wallet.address);
-    console.log("\n💳 Token Balance Check:");
-    console.log("  • Your MockUSDC balance:", ethers.formatUnits(userBalance, 6), "USDC");
-    console.log("  • Required premium:", ethers.formatUnits(premium, 6), "USDC");
-
+    const userAddress = await signer.getAddress();
+    const userBalance = await token.balanceOf(userAddress);
+    console.log(`User address: ${userAddress} | Balance: $${ethers.formatUnits(userBalance, 6)}`);
+    const nonce = await provider.getTransactionCount(userAddress);
     if (userBalance < premium) {
-      throw new Error(
-        `Insufficient MockUSDC balance. Need ${ethers.formatUnits(premium, 6)} but only have ${ethers.formatUnits(userBalance, 6)}`
-      );
+      throw new Error(`Insufficient balance. Need $${Number(premium) / 1000000}, have $${Number(userBalance) / 1000000}`);
     }
 
-    console.log("\n💰 Insurance Terms - Tiered Model:");
-    console.log("  • Purchase Price: $" + ethers.formatUnits(purchasePrice, 6));
-    console.log("  • Premium (Tier " + selectedTier + "): $" + ethers.formatUnits(premium, 6));
-    console.log("  • Coverage: 100% of price difference at claim time");
-    console.log("  • Maximum Payout: $" + ethers.formatUnits(purchasePrice, 6) + " USDC (100% drop)");
-    console.log("\n  📈 Example Scenarios:");
-    const premiumRatio = Number(premium * 100n / purchasePrice);
-    console.log("    Purchase Price: $" + ethers.formatUnits(purchasePrice, 6) + ", Premium: $" + ethers.formatUnits(premium, 6) + " (" + premiumRatio.toFixed(1) + "%)");
-    console.log("    If current price = 90% → Claim $" + ethers.formatUnits(purchasePrice / 10n, 6) + " (" + (1000/premiumRatio).toFixed(0) + "% return)");
-    console.log("    If current price = 80% → Claim $" + ethers.formatUnits(purchasePrice / 5n, 6) + " (" + (2000/premiumRatio).toFixed(0) + "% return)");
-    console.log("    If current price = 50% → Claim $" + ethers.formatUnits(purchasePrice / 2n, 6) + " (" + (5000/premiumRatio).toFixed(0) + "% return)");
+    const currentAllowance = await token.allowance(userAddress, deployment.vault);
+    if (currentAllowance < premium) {
+      console.log("Approving token spending...");
+      const approveTx = await token.approve(deployment.vault, premium, { nonce });
+      await approveTx.wait();
+      console.log("Token approval confirmed");
+    }
 
-    // Purchase policy - PRIVACY ENHANCED VERSION
-    console.log("\n🛡️ Submitting PRIVACY-ENHANCED policy purchase...");
-    console.log("  • Commitment being stored:", commitmentData.commitment);
-    console.log("  • Premium amount: $" + ethers.formatUnits(premium, 6));
-    console.log("  • PRIVACY: NO productId or purchasePrice sent to chain!");
-    console.log("  • Contract stores only: commitment, purchaseDate, buyer, claimed status");
-    console.log("  • Using Nonce:", nextNonce);
-    console.log("  • Quote Policy Count:", quote.currentPolicyCount.toString());
-    const tx = await contract.buyPolicy(commitmentData.commitment, premium, quote.currentPolicyCount, { nonce: nextNonce });
+    console.log("\nPurchasing policy...");
+    const commitmentBytes32 = ethers.zeroPadValue(ethers.toBeHex(secretCommitment), 32);
+    const purchaseTx = await vault.buyPolicy(commitmentBytes32, premium, { nonce: nonce + 1 });
+    const receipt = await purchaseTx.wait();
+    console.log(`Policy purchased! Transaction: ${receipt.hash}`);
 
-    console.log("\n📡 Transaction submitted:", tx.hash);
-    console.log("  • Premium payment (ERC20): $" + ethers.formatUnits(premium, 6));
-    console.log("  • PRIVACY: Only commitment hash stored on-chain");
-
-    // Wait for confirmation
-    const receipt = await tx.wait();
-    console.log("✅ Policy purchased!");
-    console.log("Block:", receipt.blockNumber);
-
-    // Parse events to get policy ID
-    const event = receipt.logs.find((log: any) => {
+    const policyBoughtEvent = receipt.logs.find((log: any) => {
       try {
-        const parsedLog = contract.interface.parseLog(log);
-        return parsedLog?.name === "PolicyBought";
+        const parsed = vault.interface.parseLog(log);
+        return parsed?.name === "PolicyBought";
       } catch {
         return false;
       }
     });
 
-    if (event) {
-      const parsedEvent = contract.interface.parseLog(event);
-      const policyId = parsedEvent?.args[0];
-      console.log("\n📝 Policy Created Successfully!");
-      console.log("  • Policy ID:", policyId.toString(), "(simple counter, not NFT)");
-      console.log("  • This ID links commitment → policy → proof → payout");
+    if (!policyBoughtEvent) throw new Error("PolicyBought event not found in transaction receipt");
+    const parsedEvent = vault.interface.parseLog(policyBoughtEvent);
+    const policyId = parsedEvent.args.policyId;
+    const storedPolicy = await vault.policies(policyId);
 
-      // Save policy data
-      const policyData = {
-        policyId: policyId.toString(),
-        commitment: commitmentData.commitment,
-        productId,
-        productHash: commitmentData.productHash,
-        premium: premium.toString(),
-        purchasePrice: purchasePrice.toString(),
-        selectedTier: selectedTier,
-        purchaseCount: quote.currentPolicyCount.toString(),
-        purchaseDate: Date.now(),
-        txHash: tx.hash,
-      };
+    const policyRecord = {
+      policyId: policyId.toString(),
+      transactionHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      policyPurchaseDate: Number(storedPolicy.policyPurchaseDate),
+      purchaseDetails: {
+        orderHash: purchaseDetails.orderHash,
+        invoicePrice: purchaseDetails.invoicePrice.toString(),
+        invoiceDate: purchaseDetails.invoiceDate,
+        productHash: purchaseDetails.productHash.toString(),
+        salt: purchaseDetails.salt.toString(),
+        selectedTier: purchaseDetails.selectedTier,
+        productId: invoiceData.productId,
+      },
+      secretCommitment: secretCommitment.toString(),
+      premium: premium.toString(),
+      tier: tier,
+      contracts: {
+        vault: deployment.vault,
+        token: deployment.token,
+        verifier: deployment.verifier,
+      },
+      createdAt: new Date().toISOString(),
+      network: (await provider.getNetwork()).name,
+    };
 
-      await fs.writeFile("policy-data.json", JSON.stringify(policyData, null, 2));
-      console.log("\n💾 Saving policy data to policy-data.json for next steps:");
-      console.log("  • generateProof.ts will use policyId & dates for circuit inputs");
-      console.log("  • claimProtection.ts will use policyId to submit claim");
-      console.log("\n✅ POLICY PURCHASE COMPLETE");
-      console.log("🔄 NEXT STEP: Run 'npm run update-price' to simulate price drop (testing)");
-      console.log("              Then 'npm run generate-proof' when ready to claim");
-    }
-  } catch (error) {
-    console.error("Error purchasing policy:", error);
-    throw error;
+    const policyFileName = path.join(policyDataDir, `policy.json`);
+    await fsPromises.writeFile(policyFileName, JSON.stringify(policyRecord, null, 2));
+
+    console.log(`\nPolicy Purchase Complete!`);
+    console.log(`ID: ${policyId} | Premium: $${Number(premium) / 1000000} | Tier: ${tier} | File: ${policyFileName}`);
+  } catch (error: any) {
+    console.error(`\nPolicy Purchase Failed: ${error.message}`);
+    process.exit(1);
   }
 }
 
-// Main execution
-(async () => {
-  await purchasePolicy();
-})().catch(console.error);
+if (require.main === module) {
+  main();
+}
