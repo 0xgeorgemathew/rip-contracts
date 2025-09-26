@@ -2,46 +2,48 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
-import "../src/PriceProtectionOracle.sol";
-import "../src/verifier/Groth16Verifier.sol";
+import "../src/InsuranceVault.sol";
+import "../src/verifier/PriceProtectionVerifier.sol";
 import "../src/Token.sol";
 
 contract DeployScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
+        // LOAD USER ADDRESS FROM ENV
+        address userAddress = vm.envAddress("USER_ADDRESS");
+        console.log("User address:", userAddress);
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy verifier
-        Groth16Verifier verifier = new Groth16Verifier();
-        console.log("Verifier deployed at:", address(verifier));
+        Groth16Verifier zkPriceProtectionVerifier = new Groth16Verifier();
+        console.log("zkPriceProtectionVerifier deployed at:", address(zkPriceProtectionVerifier));
 
         // Deploy ERC-20 token
-        Token token = new Token();
-        console.log("Token deployed at:", address(token));
+        Token mockUSDC = new Token();
+        console.log("Token deployed at:", address(mockUSDC));
 
-        // Deploy main contract
-        PriceProtectionOracle oracle = new PriceProtectionOracle(address(verifier), address(token));
-        console.log("PriceProtectionOracle deployed at:", address(oracle));
+        // Deploy Insurance Vault contract
+        InsuranceVault insuranceVault = new InsuranceVault(address(zkPriceProtectionVerifier), address(mockUSDC));
+        console.log("InsuranceVault deployed at:", address(insuranceVault));
 
-        // Mint 1000 tokens to Oracle (with 6 decimals = 1000 * 10^6)
-        token.mint(address(oracle), 1000 * 10**6);
-        console.log("Minted 1000 tokens to PriceProtectionOracle");
-        console.log("PriceProtectionOracle MockUSDC balance:", token.balanceOf(address(oracle)) / 10**6, "USDC");
+        // Mint 1000 tokens to InsuranceVault (with 6 decimals = 1000 * 10^6)
+        mockUSDC.mint(address(insuranceVault), 1000 * 10**6);
+        console.log("Minted 1000 tokens to InsuranceVault");
+        console.log("InsuranceVault MockUSDC balance:", mockUSDC.balanceOf(address(insuranceVault)) / 10**6, "USDC");
 
         // Mint 1000 tokens to deployer for testing (with 6 decimals = 1000 * 10^6)
-        token.mint(deployerAddress, 1000 * 10**6);
-        console.log("Minted 1000 tokens to deployer for testing");
-        console.log("Deployer MockUSDC balance:", token.balanceOf(deployerAddress) / 10**6, "USDC");
-
+        mockUSDC.mint(userAddress, 1000 * 10**6);
+        console.log("Minted 1000 tokens to user for testing");
+        console.log("User MockUSDC balance:", mockUSDC.balanceOf(userAddress) / 10**6, "USDC");
         vm.stopBroadcast();
 
         // Write deployment addresses to JSON file
         string memory deploymentJson = string(abi.encodePacked(
             '{\n',
-            '  "verifier": "', vm.toString(address(verifier)), '",\n',
-            '  "token": "', vm.toString(address(token)), '",\n',
-            '  "oracle": "', vm.toString(address(oracle)), '",\n',
+            '  "verifier": "', vm.toString(address(zkPriceProtectionVerifier)), '",\n',
+            '  "token": "', vm.toString(address(mockUSDC)), '",\n',
+            '  "vault": "', vm.toString(address(insuranceVault)), '",\n',
             '  "deployer": "', vm.toString(deployerAddress), '",\n',
             '  "timestamp": "', vm.toString(block.timestamp), '"\n',
             '}'
