@@ -12,3 +12,4 @@ fs_permissions = [{ access = "read-write", path = "./" }]
 local = "http://localhost:8545"
 
 [etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
