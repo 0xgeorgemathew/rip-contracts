@@ -1,0 +1,12 @@
+{
+  "policyId": "1",
+  "commitment": "0x21e22e732f523080bba61fec143b2d04a3922bde48cfb0b43b0620e1c479cd25",
+  "productId": "B0DHJ9SCJ4",
+  "productHash": "0x2f8263456df8ead737f38dfe986ea89577812c3cb3d275a9db5eb26e01ee28de",
+  "premium": "100000000",
+  "purchasePrice": "1049000000",
+  "selectedTier": 3,
+  "purchaseCount": "0",
+  "purchaseDate": 1758222383648,
+  "txHash": "0xf9b4777736dd48d435a69f82e81207954956b6d74026ecb50ffb4d0c7945004a"
+}
