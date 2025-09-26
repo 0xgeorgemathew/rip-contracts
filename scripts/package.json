@@ -1,20 +1,25 @@
 {
     "name": "zk-price-protection-scripts",
     "version": "1.0.0",
+    "description": "IMPORTANT: Always use utils/contractLoader.ts for contract interactions",
     "scripts": {
-        "generate-commitment": "ts-node generateCommitment.ts",
         "purchase-policy": "ts-node purchasePolicy.ts",
-        "update-price": "ts-node updatePrice.ts",
-        "generate-proof": "ts-node generateProof.ts",
-        "claim": "ts-node claimProtection.ts"
+        "claim-policy": "ts-node claimPolicy.ts",
+        "oracle:minimal": "ts-node minimalOracle.ts"
     },
     "dependencies": {
+        "@openzeppelin/merkle-tree": "^1.0.8",
         "@types/circomlibjs": "^0.1.6",
+        "@types/express": "^5.0.3",
         "@types/node": "^20.0.0",
         "@types/snarkjs": "^0.7.9",
+        "axios": "^1.12.2",
+        "circom_runtime": "^0.1.25",
         "circomlibjs": "^0.1.7",
         "dotenv": "^17.2.2",
         "ethers": "^6.15.0",
+        "express": "^5.1.0",
+        "merkletreejs": "^0.6.0",
         "snarkjs": "^0.7.0",
         "ts-node": "^10.9.1",
         "typescript": "^5.3.0"
