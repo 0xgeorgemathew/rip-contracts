@@ -23,7 +23,10 @@ export function createApiRoutes(oracle: MinimalPriceOracle): Router {
     } catch (error: any) {
       handleError(res, error, "generate merkle proof", {
         productId,
-        availableProducts: DEMO_PRODUCTS.map(p => ({ id: p.id, name: p.name }))
+        availableProducts: DEMO_PRODUCTS.map((p) => ({
+          id: p.id,
+          name: p.name,
+        })),
       });
     }
   });
@@ -39,8 +42,8 @@ export function createApiRoutes(oracle: MinimalPriceOracle): Router {
         timestamp: Date.now(),
         meta: {
           totalProducts: prices.length,
-          changedProducts: prices.filter(p => p.change !== 0).length
-        }
+          changedProducts: prices.filter((p) => p.change !== 0).length,
+        },
       });
     } catch (error: any) {
       handleError(res, error, "get prices");
@@ -48,13 +51,13 @@ export function createApiRoutes(oracle: MinimalPriceOracle): Router {
   });
 
   router.post("/drop-prices", async (req, res) => {
-    const percentage = req.body.percentage || 10;
+    const percentage = req.body.percentage || 20;
 
     if (percentage <= 0 || percentage > 50) {
       return res.status(400).json({
         error: "Percentage must be between 1 and 50",
         provided: percentage,
-        validRange: "1-50"
+        validRange: "1-50",
       });
     }
 
@@ -79,9 +82,9 @@ export function createApiRoutes(oracle: MinimalPriceOracle): Router {
           actualDrop,
           oldTotalValue: oldValue,
           newTotalValue: newValue,
-          valueLost: oldValue - newValue
+          valueLost: oldValue - newValue,
         },
-        meta: { rootChanged: oldRoot !== newRoot }
+        meta: { rootChanged: oldRoot !== newRoot },
       });
     } catch (error: any) {
       handleError(res, error, "drop prices", { percentage });

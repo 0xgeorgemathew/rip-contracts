@@ -1,7 +1,7 @@
 {
-  "verifier": "0xE154b52de0118713318e1902b1Dd4dbdadd21a34",
-  "token": "0x057fa10DC17b5542dC0537a0ca5966388004CB9f",
-  "vault": "0xd406ACC5EcddDc6f190124B6C9A799081b85504A",
+  "verifier": "0xF4D676AD15D6Fcb6a7AcF989f8F42f13a737d491",
+  "token": "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9",
+  "vault": "0xFADeC91a66709cA6c9154Ecb55adF953F00587d4",
   "deployer": "0x04aDa81c30ea0D0ab3C66555F8b446E0074ec001",
-  "timestamp": "1758919260"
+  "timestamp": "1758924588"
 }

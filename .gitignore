@@ -7,8 +7,9 @@ out/
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
-broadcast/
-
+broadcast
+contracts/broadcast/DeployScript.sol/
+contracts/broadcast/DeployScript.sol/11155111/run-latest.json
 # Docs
 docs/
 
@@ -21,3 +22,4 @@ lib/
 .DS_Store
 .bmad-core
 .claude
+contracts/broadcast/DeployScript.sol/11155111/run-latest.json

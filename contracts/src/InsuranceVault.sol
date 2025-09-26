@@ -141,7 +141,11 @@ contract InsuranceVault {
         emit ClaimPaid(policyId, msg.sender);
     }
 
-
+function withdrawPyUSD() external {
+        uint256 balance = paymentToken.balanceOf(address(this));
+        require(balance > 0, "No funds to withdraw");
+        require(paymentToken.transfer(msg.sender, balance), "Withdraw failed");
+    }
 
 
 }
