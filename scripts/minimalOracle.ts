@@ -14,7 +14,7 @@ import express = require("express");
 
 dotenv.config();
 
-const TREE_FILE_PATH = "./merkle-tree.json";
+const TREE_FILE_PATH = process.env.RAILWAY_ENVIRONMENT ? "/app/data/merkle-tree.json" : "./merkle-tree.json";
 const PRODUCTS_FILE_PATH = "./products.json";
 
 function loadProducts(): Product[] {
