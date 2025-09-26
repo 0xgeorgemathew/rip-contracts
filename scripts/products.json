@@ -1,0 +1,42 @@
+[
+  {
+    "id": "B0F6PD51CY",
+    "name": "WISHKEY 145 Pieces Art Set",
+    "basePrice": 10180000
+  },
+  {
+    "id": "MACBOOK",
+    "name": "MacBook Pro M3",
+    "basePrice": 2499000000
+  },
+  {
+    "id": "IPADAIR",
+    "name": "iPad Air",
+    "basePrice": 599000000
+  },
+  {
+    "id": "GALAXY24",
+    "name": "Samsung Galaxy S24",
+    "basePrice": 999000000
+  },
+  {
+    "id": "XPSLAPTOP",
+    "name": "Dell XPS 15",
+    "basePrice": 1899000000
+  },
+  {
+    "id": "SONYTVX90",
+    "name": "Sony X90L TV",
+    "basePrice": 1299000000
+  },
+  {
+    "id": "AIRPODS",
+    "name": "AirPods Pro",
+    "basePrice": 249000000
+  },
+  {
+    "id": "SWITCH",
+    "name": "Nintendo Switch OLED",
+    "basePrice": 349000000
+  }
+]
