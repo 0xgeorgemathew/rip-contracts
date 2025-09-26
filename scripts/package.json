@@ -1,9 +1,10 @@
 {
     "name": "zk-price-protection-scripts",
     "version": "1.0.0",
-    "type": "module",
     "scripts": {
         "generate-commitment": "ts-node generateCommitment.ts",
+        "purchase-policy": "ts-node purchasePolicy.ts",
+        "update-price": "ts-node updatePrice.ts",
         "generate-proof": "ts-node generateProof.ts",
         "claim": "ts-node claimProtection.ts"
     },
@@ -12,6 +13,7 @@
         "@types/node": "^20.0.0",
         "@types/snarkjs": "^0.7.9",
         "circomlibjs": "^0.1.7",
+        "dotenv": "^17.2.2",
         "ethers": "^6.15.0",
         "snarkjs": "^0.7.0",
         "ts-node": "^10.9.1",

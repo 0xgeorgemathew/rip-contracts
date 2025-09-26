@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "./verifier/Groth16Verifier.sol";
 import "./Token.sol";
 
-contract InsuranceVault {
+contract PriceProtectionOracle {
     Groth16Verifier public zkVerifier;
     Token public paymentToken;
 

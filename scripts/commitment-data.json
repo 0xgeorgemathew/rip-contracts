@@ -1,0 +1,18 @@
+{
+  "commitment": "0x21e22e732f523080bba61fec143b2d04a3922bde48cfb0b43b0620e1c479cd25",
+  "productHash": "0x2f8263456df8ead737f38dfe986ea89577812c3cb3d275a9db5eb26e01ee28de",
+  "productId": "B0DHJ9SCJ4",
+  "invoice": {
+    "orderNumber": "171-5907578-4275511",
+    "invoiceNumber": "HYD8-1736233",
+    "price": 1049000000,
+    "date": 1758067200,
+    "transactionId": "1zkkU91fGG1ZyscyK5mE",
+    "asin": "B0DHJ9SCJ4"
+  },
+  "invoicePrice": 1049000000,
+  "salt": "18962917592016495919074264828174710356096931409700885169217002028022197515231",
+  "orderHash": "20144264343650699423108135649335752514385621537497632848074405964147565945880",
+  "selectedTier": 3,
+  "timestamp": 1758222368044
+}
