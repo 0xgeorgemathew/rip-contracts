@@ -255,14 +255,15 @@ async function main(): Promise<void> {
     console.log("Initializing Claim Process\n=============================\n");
 
     await validateEnvironment();
-    const oracle = new OracleClient(
-      process.env.ORACLE_URL || "http://localhost:3001"
-    );
+    const oracleUrl = process.env.RAILWAY === "TRUE"
+      ? "https://loving-elegance-production.up.railway.app"
+      : "http://localhost:3001";
+    const oracle = new OracleClient(oracleUrl);
 
     const oracleConnected = await oracle.checkConnection();
     if (!oracleConnected)
       throw new Error(
-        "Oracle not connected. Ensure the oracle is running at http://localhost:3001"
+        `Oracle not connected. Ensure the oracle is running at ${oracleUrl}`
       );
     console.log("Oracle connection verified");
 
