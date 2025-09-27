@@ -16,7 +16,7 @@
 **Visual**: Split screen showing traditional insurance (complex, invasive) vs RIP (simple, private)
 **Title**: What is RIP?
 **Key Points**:
-- Revolutionary Insurance Protocol
+- Remorse Insurance Protocol
 - Buy price protection for any product
 - Complete purchase privacy
 - Automatic claim payouts

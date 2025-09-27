@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RIP Demo - Price Protection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1c3390 0%, #2a4bb8 25%, #58a96c 50%, #4e9660 75%, #1c3390 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating particles background */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(88, 169, 108, 0.6);
+            border-radius: 50%;
+            animation: float 20s infinite linear;
+            box-shadow: 0 0 6px rgba(88, 169, 108, 0.4);
+        }
+
+        @keyframes float {
+            from {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            to {
+                transform: translateY(-100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Slide container */
+        .presentation {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            max-height: 700px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            overflow-x: hidden;
+
+            /* Glassmorphism effect */
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 30px;
+            border: 1px solid rgba(88, 169, 108, 0.4);
+            box-shadow: 0 20px 40px rgba(28, 51, 144, 0.15);
+
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .slide.prev {
+            transform: translateX(-100%);
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 3.5em;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2), 0 0 20px rgba(88, 169, 108, 0.3);
+            letter-spacing: -1px;
+        }
+
+        h2 {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 30px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2), 0 0 15px rgba(28, 51, 144, 0.4);
+        }
+
+        h3 {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 15px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        p, li {
+            font-size: 1.3em;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .subtitle {
+            font-size: 1.6em;
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .tagline {
+            font-size: 1.2em;
+            color: rgba(255, 255, 255, 0.75);
+            font-style: italic;
+            margin-top: 20px;
+        }
+
+        /* Content layouts */
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            width: 100%;
+            align-items: start;
+        }
+
+        .feature-box {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(88, 169, 108, 0.3);
+            margin: 15px 0;
+            box-shadow: 0 8px 20px rgba(28, 51, 144, 0.1);
+        }
+
+        .feature-box h3 {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .emoji-icon {
+            font-size: 1.5em;
+        }
+
+        .list-clean {
+            list-style: none;
+            padding: 0;
+        }
+
+        .list-clean li {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Flow diagram */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .flow-step {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(88, 169, 108, 0.4);
+            text-align: center;
+            min-width: 140px;
+            box-shadow: 0 4px 12px rgba(28, 51, 144, 0.08);
+        }
+
+        .flow-arrow {
+            font-size: 2em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Cost comparison */
+        .cost-bar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(88, 169, 108, 0.3);
+            box-shadow: 0 4px 12px rgba(28, 51, 144, 0.1);
+        }
+
+        .cost-bar.traditional {
+            background: rgba(28, 51, 144, 0.25);
+            border: 1px solid rgba(28, 51, 144, 0.4);
+        }
+
+        .cost-bar.rip {
+            background: rgba(88, 169, 108, 0.25);
+            border: 1px solid rgba(88, 169, 108, 0.4);
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(88, 169, 108, 0.4);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover {
+            background: rgba(88, 169, 108, 0.3);
+            border: 1px solid rgba(88, 169, 108, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(28, 51, 144, 0.25);
+        }
+
+        /* Slide indicator */
+        .indicator {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1em;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.12);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(88, 169, 108, 0.4);
+            box-shadow: 0 4px 12px rgba(28, 51, 144, 0.1);
+        }
+
+        /* Architecture diagram */
+        .architecture {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            width: 100%;
+            margin: 30px 0;
+        }
+
+        .arch-component {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(88, 169, 108, 0.3);
+            text-align: center;
+            box-shadow: 0 6px 16px rgba(28, 51, 144, 0.08);
+        }
+
+        .tech-pill {
+            display: inline-block;
+            background: rgba(88, 169, 108, 0.2);
+            border: 1px solid rgba(88, 169, 108, 0.4);
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5em; }
+            h2 { font-size: 2em; }
+            .slide { padding: 30px; }
+            .two-column { grid-template-columns: 1fr; }
+            .flow-diagram { flex-direction: column; }
+            .architecture { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated particles background -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Slide indicator -->
+    <div class="indicator">
+        <span id="currentSlide">1</span> / <span id="totalSlides">10</span>
+    </div>
+
+    <!-- Main presentation container -->
+    <div class="presentation">
+        
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <h1>🛡️ RIP Demo</h1>
+            <p class="subtitle">Price Protection Using ZK and Ethereum Blobs</p>
+            <p class="tagline">A proof of concept built entirely on Ethereum's cutting-edge technologies</p>
+            <div style="margin-top: 40px;">
+                <span style="font-size: 4em;">🔐💰⛓️</span>
+            </div>
+        </div>
+
+        <!-- Slide 2: What is RIP? -->
+        <div class="slide">
+            <h2>What is RIP? 🤔</h2>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3em; margin-bottom: 15px;">🛡️💰🔐</div>
+                <h3 style="font-size: 2em; margin-bottom: 20px;">Remorse Insurance Protocol</h3>
+            </div>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <p style="font-size: 1.2em; margin-bottom: 15px; line-height: 1.5;">
+                    RIP is a <strong>Zero-Knowledge Price Protection System</strong> that lets you insure any product purchase without revealing what you bought, how much you paid, or any personal details.
+                </p>
+            </div>
+            <div style="text-align: left; max-width: 700px; margin: 0 auto;">
+                <ul class="list-clean" style="font-size: 1.1em; line-height: 1.4;">
+                    <li style="white-space: nowrap;"><span>🛍️</span> <span><strong>Shop anywhere:</strong> Buy products on Amazon, eBay, or any e-commerce site</span></li>
+                    <li style="white-space: nowrap;"><span>🔐</span> <span><strong>Commit privately:</strong> Generate cryptographic commitment of your purchase</span></li>
+                    <li style="white-space: nowrap;"><span>💳</span> <span><strong>Buy protection:</strong> Pay a small premium based on price tier, not product type</span></li>
+                    <li style="white-space: nowrap;"><span>📊</span> <span><strong>Automatic monitoring:</strong> Oracle tracks prices using Ethereum blobs</span></li>
+                    <li style="white-space: nowrap;"><span>⚡</span> <span><strong>Instant claims:</strong> Prove price drops with ZK proofs, get paid automatically</span></li>
+                </ul>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="font-size: 1.1em; color: rgba(255, 255, 255, 0.8); font-style: italic;">
+                    💡 <strong>Want to understand the technical details?</strong> Explore the complete implementation in our GitHub repository
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 3: Core Technologies -->
+        <div class="slide">
+            <h2>Built on Ethereum's Latest 🚀</h2>
+            <div class="two-column">
+                <div class="feature-box">
+                    <h3><span class="emoji-icon">📦</span> Ethereum Blobs</h3>
+                    <p style="font-size: 1.1em; margin-bottom: 15px;">EIP-4844 Technology</p>
+                    <ul class="list-clean">
+                        <li>💸 90% cheaper storage</li>
+                        <li>📈 Scalable price tracking</li>
+                        <li>⛓️ Fully decentralized</li>
+                    </ul>
+                </div>
+                <div class="feature-box">
+                    <h3><span class="emoji-icon">🔐</span> Zero Knowledge Proofs</h3>
+                    <p style="font-size: 1.1em; margin-bottom: 15px;">Groth16 Circuits</p>
+                    <ul class="list-clean">
+                        <li>🕵️ Complete privacy</li>
+                        <li>✅ Mathematical verification</li>
+                        <li>🤫 No data revealed</li>
+                    </ul>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 30px; font-size: 1.3em;">
+                <strong>Why These?</strong> Cost-efficient at scale • Privacy by design • Trustless verification
+            </p>
+        </div>
+
+        <!-- Slide 4: Ethereum Blobs Explained -->
+        <div class="slide">
+            <h2>Ethereum Blobs - Efficient Data Layer 📦</h2>
+            <div style="margin: 30px 0;">
+                <div class="cost-bar traditional">
+                    <span>🏛️ Traditional On-Chain Storage</span>
+                    <span style="font-size: 1.5em; font-weight: bold;">$100</span>
+                </div>
+                <div class="cost-bar rip">
+                    <span>📦 Blob Storage</span>
+                    <span style="font-size: 1.5em; font-weight: bold;">$10</span>
+                </div>
+            </div>
+            <div class="flow-diagram">
+                <div class="flow-step">🔮 Oracle</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">📦 Blob</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">📜 Smart Contract</div>
+            </div>
+            <ul class="list-clean" style="max-width: 700px; margin: 30px auto;">
+                <li>💾 Stores complete product price data</li>
+                <li>💰 90% cost reduction vs on-chain storage</li>
+                <li>🎯 Perfect for oracle price feeds</li>
+                <li>🌐 Maintains full decentralization</li>
+            </ul>
+        </div>
+
+        <!-- Slide 5: Zero Knowledge Proofs -->
+        <div class="slide">
+            <h2>Zero Knowledge Proofs - Privacy Shield 🛡️</h2>
+            <div style="display: flex; justify-content: center; align-items: center; margin: 40px 0;">
+                <div style="text-align: center;">
+                    <div style="font-size: 5em; margin-bottom: 20px;">🔒</div>
+                    <h3>What You Prove ✅</h3>
+                    <ul class="list-clean" style="text-align: left;">
+                        <li>✓ "I bought something"</li>
+                        <li>✓ "Price dropped"</li>
+                        <li>✓ "I deserve payout"</li>
+                    </ul>
+                </div>
+                <div style="margin: 0 60px; font-size: 3em;">≠</div>
+                <div style="text-align: center;">
+                    <div style="font-size: 5em; margin-bottom: 20px;">🤐</div>
+                    <h3>What Stays Hidden 🔐</h3>
+                    <ul class="list-clean" style="text-align: left;">
+                        <li>❌ Product details</li>
+                        <li>❌ Purchase amount</li>
+                        <li>❌ Personal data</li>
+                    </ul>
+                </div>
+            </div>
+            <p style="text-align: center; font-size: 1.3em; margin-top: 30px;">
+                ZK proofs let users prove they deserve payouts without revealing ANY purchase details!
+            </p>
+        </div>
+
+        <!-- Slide 6: Merkle Trees -->
+        <div class="slide">
+            <h2>Merkle Trees - Trustless Price Oracle 🌳</h2>
+            <div style="text-align: center; margin: 40px 0;">
+                <div style="font-size: 1.2em; margin-bottom: 30px;">
+                    <div style="display: inline-block; margin: 10px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                        🌐 Root Hash
+                    </div>
+                    <div>↗️ ↖️</div>
+                    <div style="display: flex; justify-content: center; gap: 40px;">
+                        <div style="padding: 10px; background: rgba(255,255,255,0.08); border-radius: 10px;">Branch</div>
+                        <div style="padding: 10px; background: rgba(255,255,255,0.08); border-radius: 10px;">Branch</div>
+                    </div>
+                    <div>↗️ ↖️ ↗️ ↖️</div>
+                    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 10px;">
+                        <span>📱</span><span>💻</span><span>🎮</span><span>📷</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: rgba(255,255,255,0.7);">Products with Prices</div>
+                </div>
+            </div>
+            <ul class="list-clean" style="max-width: 700px; margin: 0 auto;">
+                <li>🔮 Oracle monitors all product prices</li>
+                <li>🌲 Merkle root stored on-chain</li>
+                <li>📦 Complete tree in blob storage</li>
+                <li>🔑 Cryptographic price proofs</li>
+            </ul>
+        </div>
+
+        <!-- Slide 7: Purchase Process -->
+        <div class="slide" style="justify-content: flex-start; padding: 40px 60px;">
+            <h2 style="margin-bottom: 20px; margin-top: 0;">Purchase Process 🛍️</h2>
+
+            <div style="margin: 20px 0;">
+                <div class="flow-diagram">
+                    <div class="flow-step">🛒 Shop</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">🔐 Commit</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">💳 Pay Premium</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">📜 Get Policy</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">📊 Monitor</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; align-items: start; margin: 20px 0; gap: 30px;">
+                <div style="text-align: center; flex: 1;">
+                    <div style="background: rgba(88,169,108,0.25); border: 1px solid rgba(88,169,108,0.4); padding: 15px; border-radius: 15px;">
+                        <h3 style="margin-bottom: 12px; font-size: 1.5em;">✅ What Gets Committed</h3>
+                        <ul class="list-clean" style="text-align: left; font-size: 0.9em;">
+                            <li>🆔 Policy ID (generated)</li>
+                            <li>🔒 Commitment hash (encrypted)</li>
+                            <li>💳 Premium tier (1-5)</li>
+                            <li>📅 Policy purchase date</li>
+                            <li>⚡ Policy activation status</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="font-size: 2.5em; color: rgba(255,255,255,0.6); align-self: center;">≠</div>
+
+                <div style="text-align: center; flex: 1;">
+                    <div style="background: rgba(28,51,144,0.25); border: 1px solid rgba(28,51,144,0.4); padding: 15px; border-radius: 15px;">
+                        <h3 style="margin-bottom: 12px; font-size: 1.5em;">🔐 What Stays Hidden</h3>
+                        <ul class="list-clean" style="text-align: left; font-size: 0.9em;">
+                            <li>❌ Product identity</li>
+                            <li>❌ Purchase price</li>
+                            <li>❌ Product category</li>
+                            <li>❌ Store/website</li>
+                            <li>❌ Personal details</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="font-size: 1.1em; color: rgba(255, 255, 255, 0.9);">
+                    <strong>🔬 Cryptographic Privacy:</strong> Generate commitments locally - only hash goes on-chain!
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 8: Claim Process -->
+        <div class="slide" style="justify-content: flex-start; padding: 40px 60px;">
+            <h2 style="margin-bottom: 20px; margin-top: 0;">Claim Process ⚡</h2>
+
+            <div style="margin: 20px 0;">
+                <div class="flow-diagram">
+                    <div class="flow-step">📉 Price Drop</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">🌳 Get Proof</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">🔐 ZK Proof</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">📜 Submit</div>
+                    <span class="flow-arrow">→</span>
+                    <div class="flow-step">💰 Payout!</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: center; align-items: start; margin: 20px 0; gap: 30px;">
+                <div style="text-align: center; flex: 1;">
+                    <div style="background: rgba(88,169,108,0.25); border: 1px solid rgba(88,169,108,0.4); padding: 15px; border-radius: 15px;">
+                        <h3 style="margin-bottom: 12px; font-size: 1.5em;">✅ What You Prove</h3>
+                        <ul class="list-clean" style="text-align: left; font-size: 0.9em;">
+                            <li>🛡️ Valid policy ownership</li>
+                            <li>📊 Price exists in oracle tree</li>
+                            <li>📉 Price dropped below purchase</li>
+                            <li>💳 Paid correct premium tier</li>
+                            <li>🧮 Calculated payout amount</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="font-size: 2.5em; color: rgba(255,255,255,0.6); align-self: center;">≠</div>
+
+                <div style="text-align: center; flex: 1;">
+                    <div style="background: rgba(28,51,144,0.25); border: 1px solid rgba(28,51,144,0.4); padding: 15px; border-radius: 15px;">
+                        <h3 style="margin-bottom: 12px; font-size: 1.5em;">🔐 What Stays Hidden</h3>
+                        <ul class="list-clean" style="text-align: left; font-size: 0.9em;">
+                            <li>❌ Product identity</li>
+                            <li>❌ Purchase price</li>
+                            <li>❌ Current price</li>
+                            <li>❌ Purchase date</li>
+                            <li>❌ Personal details</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="font-size: 1.1em; color: rgba(255, 255, 255, 0.9);">
+                    <strong>🔬 Mathematical Proof:</strong> Verify claim validity without exposing any sensitive data!
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 10: System Architecture -->
+        <div class="slide">
+            <h2>Complete System Architecture 🏗️</h2>
+            <div class="architecture">
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🖥️</div>
+                    <h3>Frontend</h3>
+                    <div class="tech-pill">🔌 Chrome Extension</div>
+                    <div class="tech-pill">⚡ Vercel App</div>
+                </div>
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🔮</div>
+                    <h3>Oracle</h3>
+                    <div class="tech-pill">📊 Price Monitor</div>
+                    <div class="tech-pill">🌳 Merkle Builder</div>
+                </div>
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">📦</div>
+                    <h3>Storage</h3>
+                    <div class="tech-pill">⛓️ Ethereum Blobs</div>
+                    <div class="tech-pill">💾 Price Data</div>
+                </div>
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">📜</div>
+                    <h3>Blockchain</h3>
+                    <div class="tech-pill">📝 Smart Contracts</div>
+                    <div class="tech-pill">🔐 ZK Verifier</div>
+                </div>
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🛡️</div>
+                    <h3>Privacy</h3>
+                    <div class="tech-pill">🔐 ZK Circuits</div>
+                    <div class="tech-pill">🤝 Commitments</div>
+                </div>
+                <div class="arch-component">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🔄</div>
+                    <h3>User Flow</h3>
+                    <div class="tech-pill">🛒 Purchase</div>
+                    <div class="tech-pill">📊 Monitor</div>
+                    <div class="tech-pill">💰 Claim</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 11: Thank You -->
+        <div class="slide">
+            <h1>Thank You! 🙏</h1>
+            <div style="margin: 40px 0; font-size: 5em; text-align: center;">
+                🛡️💰🔐
+            </div>
+            <div style="text-align: center;">
+                <h3>Demo Time! 🎮</h3>
+                <p style="font-size: 1.3em; margin: 20px 0;">Live demonstration of complete system</p>
+                <div style="margin-top: 30px;">
+                    <p style="font-size: 1.2em;">🚀 <strong>Innovation:</strong> First to combine Blobs + ZK for commerce</p>
+                    <p style="font-size: 1.2em;">🌍 <strong>Impact:</strong> Privacy-preserving insurance for everyone</p>
+                </div>
+            </div>
+            <div style="position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);">
+                <p style="color: rgba(255,255,255,0.6); font-size: 1em;">Built with ❤️ for the hackathon</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav">
+        <button class="nav-btn" onclick="previousSlide()">⬅️ Previous</button>
+        <button class="nav-btn" onclick="nextSlide()">Next ➡️</button>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 10;
+
+        // Create floating particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // Update slide visibility
+        function showSlide(n) {
+            const slides = document.getElementsByClassName('slide');
+            
+            // Wrap around
+            if (n > totalSlides) currentSlide = 1;
+            if (n < 1) currentSlide = totalSlides;
+            
+            // Update all slides
+            for (let i = 0; i < slides.length; i++) {
+                slides[i].classList.remove('active', 'prev');
+                if (i < currentSlide - 1) {
+                    slides[i].classList.add('prev');
+                } else if (i === currentSlide - 1) {
+                    slides[i].classList.add('active');
+                }
+            }
+            
+            // Update indicator
+            document.getElementById('currentSlide').textContent = currentSlide;
+        }
+
+        function nextSlide() {
+            currentSlide++;
+            showSlide(currentSlide);
+        }
+
+        function previousSlide() {
+            currentSlide--;
+            showSlide(currentSlide);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                previousSlide();
+            } else if (e.key >= '0' && e.key <= '9') {
+                const slideNum = parseInt(e.key);
+                if (slideNum > 0 && slideNum <= totalSlides) {
+                    currentSlide = slideNum;
+                    showSlide(currentSlide);
+                }
+            } else if (e.key === '0') {
+                currentSlide = 10;
+                showSlide(currentSlide);
+            }
+        });
+
+        // Touch/swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            if (touchEndX < touchStartX - 50) {
+                nextSlide();
+            }
+            if (touchEndX > touchStartX + 50) {
+                previousSlide();
+            }
+        }
+
+        // Add pulse animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.1); opacity: 0.8; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize
+        createParticles();
+        showSlide(currentSlide);
+
+        // Update total slides indicator
+        document.getElementById('totalSlides').textContent = totalSlides;
+    </script>
+</body>
+</html>
