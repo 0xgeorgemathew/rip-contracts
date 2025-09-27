@@ -1,4 +1,8 @@
 import { buildPoseidon } from "circomlibjs";
+import * as kzg from "c-kzg";
+import { JsonBlobUtils } from "./utils/shared/json-utils";
+import { BlobUtils } from "./utils/shared/utils";
+import { GAS_CONFIG } from "./utils/shared/config";
 import * as dotenv from "dotenv";
 import { ethers } from "ethers";
 import * as fs from "fs";
@@ -50,6 +54,9 @@ class MinimalPriceOracle {
   }
 
   async init(): Promise<void> {
+    // Initialize KZG trusted setup first for blob operations
+    kzg.loadTrustedSetup(0);
+    console.log("✅ KZG trusted setup loaded");
     this.poseidon = await buildPoseidon();
     await this.initializeTreeState();
     await this.initContract();
@@ -84,6 +91,16 @@ class MinimalPriceOracle {
       console.log(`   On-chain: ${onChainRoot}`);
       console.log(`   Updating on-chain to match local state...`);
       await this.updateMerkleRootOnChain(localRoot);
+    }
+
+    // Store merkle tree data as blob transaction
+    try {
+      console.log("📦 Storing merkle tree data as EIP-4844 blob...");
+      const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+      console.log(`✅ Blob transaction successful: ${txHash}`);
+    } catch (error) {
+      console.error("❌ Blob storage failed:", error);
+      // Don't throw - blob storage is not critical for oracle operation
     }
   }
 
@@ -290,6 +307,76 @@ class MinimalPriceOracle {
       console.error("Failed to read on-chain merkle root:", error);
       return null;
     }
+  }
+
+  async sendJSONFileTransaction(filePath: string): Promise<string> {
+    console.log("📂 Reading JSON file:", filePath);
+
+    const jsonData = JsonBlobUtils.readJSONFromFile(filePath);
+    console.log("✅ JSON file parsed successfully");
+    console.log("📊 JSON data size:", JsonBlobUtils.calculateJSONSize(jsonData), "bytes");
+
+    const { blob, commitment } = JsonBlobUtils.createBlobFromJSONFile(filePath);
+    const versionedHash = JsonBlobUtils.createVersionedHash(commitment);
+
+    return this.executeBlobTransaction(blob, versionedHash);
+  }
+
+  private async executeBlobTransaction(blob: Uint8Array, versionedHash: string): Promise<string> {
+    await this.checkPendingTransactions();
+
+    const [feeData, blobBaseFee] = await Promise.all([
+      this.signer.provider.getFeeData(),
+      BlobUtils.calculateBlobGasPrice(this.signer.provider)
+    ]);
+
+    if (!feeData.maxFeePerGas || !feeData.maxPriorityFeePerGas) {
+      throw new Error("Unable to fetch gas prices");
+    }
+
+    const fees = BlobUtils.calculateFees(feeData.maxFeePerGas, blobBaseFee);
+    console.log(`💰 Total fee: ${ethers.formatEther(fees.totalFee)} ETH`);
+
+    const transaction = {
+      type: 3,
+      to: this.signer.address,
+      value: 0,
+      data: "0x",
+      gasLimit: GAS_CONFIG.BASE_GAS_LIMIT,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      maxFeePerBlobGas: blobBaseFee * GAS_CONFIG.BLOB_GAS_MULTIPLIER,
+      blobVersionedHashes: [versionedHash],
+      blobs: [blob],
+      kzg
+    };
+
+    const response = await this.signer.sendTransaction(transaction);
+    const receipt = await response.wait();
+
+    if (!receipt) throw new Error("Transaction failed");
+
+    console.log(`✨ Confirmed in block: ${receipt.blockNumber}`);
+    return response.hash;
+  }
+
+  private async checkPendingTransactions(): Promise<void> {
+    const [currentNonce, pendingNonce] = await Promise.all([
+      this.signer.provider.getTransactionCount(this.signer.address),
+      this.signer.provider.getTransactionCount(this.signer.address, 'pending')
+    ]);
+
+    console.log(`🔍 Nonce check: current=${currentNonce}, pending=${pendingNonce}`);
+
+    if (pendingNonce > currentNonce) {
+      const pendingCount = pendingNonce - currentNonce;
+      throw new Error(
+        `❌ Cannot send transaction: ${pendingCount} pending transaction(s) blocking the queue. ` +
+        `Wait for pending transactions to clear or use a different wallet.`
+      );
+    }
+
+    console.log(`✅ No pending transactions - proceeding with nonce ${currentNonce}`);
   }
 }
 
