@@ -1,37 +1,37 @@
-# Speaker Notes for RIP Demo Presentation (2 minutes)
+# Speaker Notes for RIP Demo Presentation (90 seconds)
 
-## Slide 1: Title (5 sec)
-"Welcome! Today I'm introducing RIP - the Remorse Insurance Protocol - a privacy-preserving price protection system using Ethereum's cutting-edge tech."
+## Slide 1: Title (3 sec)
+"Hi! I'm excited to show you RIP - a way to get price protection without anyone knowing what you bought."
 
-## Slide 2: What is RIP? (15 sec)
-"RIP lets you insure any online purchase without revealing what you bought. Buy on Amazon, generate a cryptographic commitment, pay a small premium, and if the price drops - submit your ZK proof to claim payouts. Complete privacy through zero-knowledge proofs."
+## Slide 2: What is RIP? (10 sec)
+"Ever buy something on Amazon and see it cheaper next week? RIP fixes that. Buy anything, get insurance, and if the price drops - we pay you back. The magic? No one ever knows what you bought."
 
-## Slide 3: Core Technologies (12 sec)
-"We built this on two game-changing Ethereum features: EIP-4844 Blobs give us 90% cheaper storage for price tracking. Groth16 ZK circuits ensure complete privacy - no product details ever exposed."
+## Slide 3: Core Technologies (8 sec)
+"We use two cool Ethereum features: Blobs for super cheap storage and ZK proofs for total privacy."
 
-## Slide 4: Ethereum Blobs (10 sec)
-"Blobs are Ethereum's new data layer. Traditional storage costs $100 - blobs cost just $10. Our oracle stores complete price data in blobs, maintaining decentralization at a fraction of the cost."
+## Slide 4: Ethereum Blobs (8 sec)
+"Think of blobs like Ethereum's bulk storage discount. Instead of $100 to store prices, we pay just $10. Same security, 90% cheaper."
 
-## Slide 5: Zero Knowledge Proofs (12 sec)
-"ZK proofs are magical - you prove you deserve a payout without revealing ANY purchase details. Prove 'I bought something and price dropped' without saying what product, what price, or any personal data."
+## Slide 5: Zero Knowledge Proofs (10 sec)
+"This is the coolest part - I can prove 'Hey, I bought something and the price dropped' without telling you what I bought or how much I paid. It's like showing a receipt with everything blacked out except the refund amount."
 
-## Slide 6: Merkle Trees (10 sec)
-"Our oracle monitors all product prices in a merkle tree. Only the root hash goes on-chain, complete tree in blob storage. Users get cryptographic price proofs without revealing which product they're claiming for."
+## Slide 6: Merkle Trees (8 sec)
+"We track thousands of product prices in a tree structure. Only the tree's fingerprint goes on-chain - super efficient, totally private."
 
-## Slide 7: Purchase Process (15 sec)
-"When you buy insurance: shop normally, generate a local commitment hash, pay premium based on price tier not product type, get policy ID. Everything stays private - only the hash goes on-chain. No product identity, no purchase price revealed."
+## Slide 7: Purchase Process (10 sec)
+"Here's how easy it is: Buy on Amazon, click our extension, it creates a secret hash, pay $5-100 premium based on price range. That's it - you're covered."
 
-## Slide 8: Claim Process (15 sec)
-"When prices drop: get merkle proof from oracle, generate ZK proof locally, submit your claim to the smart contract for verification and payout. You prove ownership and price drop mathematically without exposing any sensitive data."
+## Slide 8: Claim Process (10 sec)
+"Price drops? Just click claim. Our system generates a proof, verifies it on-chain, and boom - money in your wallet. No questions asked, no data exposed."
 
-## Slide 9: System Architecture (18 sec)
-"Complete end-to-end system: Chrome extension for purchases, price oracle with merkle trees, blob storage for efficiency, smart contracts with ZK verification, all privacy-preserving. Everything working together seamlessly."
+## Slide 9: System Architecture (10 sec)
+"Everything works together: Chrome extension, price oracle, blob storage, smart contracts. Fully automated, fully private."
 
-## Slide 10: Thank You & Demo (8 sec)
-"That's RIP - first to combine blobs and ZK for commerce. Let me show you the live demo of how it all works!"
+## Slide 10: Thank You & Demo (5 sec)
+"That's RIP - making price protection actually private. Let me show you live!"
 
 ---
-**Total: ~2 minutes**
+**Total: ~90 seconds**
 
 ## Key Points to Emphasize:
 - **Innovation**: First to combine Ethereum blobs with ZK proofs for commerce
