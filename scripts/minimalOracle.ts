@@ -378,19 +378,18 @@ class MinimalPriceOracle {
     const rootBytes32 = `0x${BigInt(currentRoot).toString(16).padStart(64, "0")}`;
 
     // Prepare the contract call data for updateMerkleRoot
-    // const callData = this.merkleRegistryContract.interface.encodeFunctionData("updateMerkleRoot", [rootBytes32]);
+    const callData = this.merkleRegistryContract.interface.encodeFunctionData("updateMerkleRoot", [rootBytes32]);
 
     // Use static gas limit for blob transactions since gas estimation doesn't work with blobs
     // The updateMerkleRoot function is simple and should use around 50-70k gas
-    // const gasLimit = BigInt(100000); // 100k gas should be sufficient with buffer
+    const gasLimit = BigInt(200000); // 200k gas to ensure we don't hit gas limit
 
     const transaction = {
       type: 3,
-      // to: await this.merkleRegistryContract.getAddress(),
-      to: '0x04aDa81c30ea0D0ab3C66555F8b446E0074ec001', // Temporary workaround until ethers.js fixes the issue
+      to: await this.merkleRegistryContract.getAddress(),
       value: 0,
-      data: '0x',
-      gasLimit: GAS_CONFIG.BASE_GAS_LIMIT,
+      data: callData,
+      gasLimit: gasLimit,
       maxFeePerGas: feeData.maxFeePerGas,
       maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
       maxFeePerBlobGas: blobBaseFee * GAS_CONFIG.BLOB_GAS_MULTIPLIER,
@@ -400,8 +399,19 @@ class MinimalPriceOracle {
     };
 
     console.log(`📤 Sending blob transaction to MerkleRootBlobRegistry: ${transaction.to}`);
-    // console.log(`📝 Updating merkle root: ${rootBytes32}`);
-    // console.log(`⛽ Gas limit: ${gasLimit}`);
+    console.log(`📝 Updating merkle root: ${rootBytes32}`);
+    console.log(`⛽ Gas limit: ${gasLimit}`);
+    console.log(`📊 Call data: ${callData}`);
+    console.log(`📊 Transaction data field: ${transaction.data}`);
+    console.log(`📊 Blob versioned hashes: ${JSON.stringify(transaction.blobVersionedHashes)}`);
+    console.log(`📊 Number of blobs: ${transaction.blobs ? transaction.blobs.length : 0}`);
+
+    // Verify contract ownership before sending
+    const contractOwner = await this.merkleRegistryContract.owner();
+    const signerAddress = await this.signer.getAddress();
+    console.log(`📋 Contract owner: ${contractOwner}`);
+    console.log(`📋 Signer address: ${signerAddress}`);
+    console.log(`📋 Owner match: ${contractOwner.toLowerCase() === signerAddress.toLowerCase()}`);
 
     try {
       const response = await this.signer.sendTransaction(transaction);
@@ -411,7 +421,7 @@ class MinimalPriceOracle {
 
       console.log(`✨ Confirmed in block: ${receipt.blockNumber}`);
       console.log(`⛽ Gas used: ${receipt.gasUsed}`);
-      // console.log(`✅ Merkle root updated on MerkleRootBlobRegistry with blob data`);
+      console.log(`✅ Merkle root updated on MerkleRootBlobRegistry with blob data`);
       return response.hash;
     } catch (error) {
       console.error("❌ Blob transaction failed:", error);
