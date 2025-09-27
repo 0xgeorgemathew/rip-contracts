@@ -92,22 +92,24 @@ class MinimalPriceOracle {
       console.log(`   On-chain: ${onChainRoot}`);
       console.log(`   Updating on-chain to match local state...`);
       await this.updateMerkleRootOnChain(localRoot);
-    }
 
-    // Store merkle tree data as blob transaction to MerkleRootBlobRegistry
-    if (this.merkleRegistryContract) {
-      try {
-        console.log("📦 Storing merkle tree data as EIP-4844 blob to MerkleRootBlobRegistry...");
-        console.log('TREE_FILE_PATH:', TREE_FILE_PATH);
-        
-        const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
-        console.log(`✅ Blob transaction successful: ${txHash}`);
-      } catch (error) {
-        console.error("❌ Blob storage failed:", error);
-        // Don't throw - blob storage is not critical for oracle operation
+      // Store merkle tree data as blob transaction to MerkleRootBlobRegistry only when updating
+      if (this.merkleRegistryContract) {
+        try {
+          console.log("📦 Storing merkle tree data as EIP-4844 blob to MerkleRootBlobRegistry...");
+          console.log('TREE_FILE_PATH:', TREE_FILE_PATH);
+
+          const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+          console.log(`✅ Blob transaction successful: ${txHash}`);
+        } catch (error) {
+          console.error("❌ Blob storage failed:", error);
+          // Don't throw - blob storage is not critical for oracle operation
+        }
+      } else {
+        console.log("⚠️  MerkleRootBlobRegistry not available - skipping blob storage");
       }
     } else {
-      console.log("⚠️  MerkleRootBlobRegistry not available - skipping blob storage");
+      console.log("✅ Roots already synchronized - no blob storage needed");
     }
   }
 
@@ -282,6 +284,18 @@ class MinimalPriceOracle {
     this.rebuildTree();
     if (this.tree && this.contract) {
       await this.updateMerkleRootOnChain(this.tree.getRoot());
+
+      // Store updated merkle tree data as blob transaction after price changes
+      if (this.merkleRegistryContract) {
+        try {
+          console.log("📦 Storing updated merkle tree data as EIP-4844 blob...");
+          const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+          console.log(`✅ Blob transaction successful: ${txHash}`);
+        } catch (error) {
+          console.error("❌ Blob storage failed:", error);
+          // Don't throw - blob storage is not critical for oracle operation
+        }
+      }
     }
   }
 
