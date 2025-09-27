@@ -23,3 +23,9 @@ lib/
 .bmad-core
 .claude
 contracts/broadcast/DeployScript.sol/11155111/run-latest.json
+
+# Allow Railway deployment files
+!scripts/deployment.json
+!scripts/contracts/
+!scripts/contracts/out/
+!scripts/contracts/out/**/*.json
