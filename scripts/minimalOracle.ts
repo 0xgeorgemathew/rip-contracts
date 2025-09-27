@@ -1,4 +1,8 @@
 import { buildPoseidon } from "circomlibjs";
+import * as kzg from "c-kzg";
+import { JsonBlobUtils } from "./utils/shared/json-utils";
+import { BlobUtils } from "./utils/shared/utils";
+import { GAS_CONFIG } from "./utils/shared/config";
 import * as dotenv from "dotenv";
 import { ethers } from "ethers";
 import * as fs from "fs";
@@ -40,6 +44,7 @@ class MinimalPriceOracle {
   private poseidon: any;
   private initialized = false;
   private contract: any;
+  private merkleRegistryContract: any;
   private signer: any;
   private productHashMap = new Map<string, string>();
   private leafHashMap = new Map<string, string>();
@@ -50,6 +55,9 @@ class MinimalPriceOracle {
   }
 
   async init(): Promise<void> {
+    // Initialize KZG trusted setup first for blob operations
+    kzg.loadTrustedSetup(0);
+    console.log("✅ KZG trusted setup loaded");
     this.poseidon = await buildPoseidon();
     await this.initializeTreeState();
     await this.initContract();
@@ -84,6 +92,24 @@ class MinimalPriceOracle {
       console.log(`   On-chain: ${onChainRoot}`);
       console.log(`   Updating on-chain to match local state...`);
       await this.updateMerkleRootOnChain(localRoot);
+
+      // Store merkle tree data as blob transaction to MerkleRootBlobRegistry only when updating
+      if (this.merkleRegistryContract) {
+        try {
+          console.log("📦 Storing merkle tree data as EIP-4844 blob to MerkleRootBlobRegistry...");
+          console.log('TREE_FILE_PATH:', TREE_FILE_PATH);
+
+          const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+          console.log(`✅ Blob transaction successful: ${txHash}`);
+        } catch (error) {
+          console.error("❌ Blob storage failed:", error);
+          // Don't throw - blob storage is not critical for oracle operation
+        }
+      } else {
+        console.log("⚠️  MerkleRootBlobRegistry not available - skipping blob storage");
+      }
+    } else {
+      console.log("✅ Roots already synchronized - no blob storage needed");
     }
   }
 
@@ -92,10 +118,21 @@ class MinimalPriceOracle {
       if (!process.env.DEPLOYER_PRIVATE_KEY) throw new Error("DEPLOYER_PRIVATE_KEY not set");
       const provider = new ethers.JsonRpcProvider(process.env.RPC_URL || "http://localhost:8545");
       this.signer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+
+      // Load main deployment addresses
       const deployment = await loadDeploymentAddresses();
       if (!deployment.vault) throw new Error("Vault address not found");
       this.contract = await getContractInstance("InsuranceVault", deployment.vault, this.signer);
-      console.log("Contract connected:", deployment.vault);
+      console.log("InsuranceVault connected:", deployment.vault);
+
+      // Load merkle registry deployment
+      const merkleDeployment = await this.loadMerkleRegistryAddresses();
+      if (merkleDeployment.merkleRegistry) {
+        this.merkleRegistryContract = await getContractInstance("MerkleRootBlobRegistry", merkleDeployment.merkleRegistry, this.signer);
+        console.log("MerkleRootBlobRegistry connected:", merkleDeployment.merkleRegistry);
+      } else {
+        console.log("⚠️  MerkleRootBlobRegistry not deployed - blob transactions will be disabled");
+      }
     } catch (error) {
       console.log("Contract connection failed - running in local-only mode:", error);
     }
@@ -247,6 +284,18 @@ class MinimalPriceOracle {
     this.rebuildTree();
     if (this.tree && this.contract) {
       await this.updateMerkleRootOnChain(this.tree.getRoot());
+
+      // Store updated merkle tree data as blob transaction after price changes
+      if (this.merkleRegistryContract) {
+        try {
+          console.log("📦 Storing updated merkle tree data as EIP-4844 blob...");
+          const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+          console.log(`✅ Blob transaction successful: ${txHash}`);
+        } catch (error) {
+          console.error("❌ Blob storage failed:", error);
+          // Don't throw - blob storage is not critical for oracle operation
+        }
+      }
     }
   }
 
@@ -290,6 +339,130 @@ class MinimalPriceOracle {
       console.error("Failed to read on-chain merkle root:", error);
       return null;
     }
+  }
+
+  private async loadMerkleRegistryAddresses(): Promise<{ merkleRegistry?: string }> {
+    try {
+      const deploymentData = fs.readFileSync("../contracts/merkle-registry-deployment.json", "utf8");
+      return JSON.parse(deploymentData);
+    } catch (error) {
+      console.log("⚠️  MerkleRootBlobRegistry deployment not found - blob transactions will be disabled");
+      return {};
+    }
+  }
+
+  async sendJSONFileTransaction(filePath: string): Promise<string> {
+    console.log("📂 Reading JSON file:", filePath);
+
+    const jsonData = JsonBlobUtils.readJSONFromFile(filePath);
+    const jsonSize = JsonBlobUtils.calculateJSONSize(jsonData);
+    console.log("✅ JSON file parsed successfully");
+    console.log("📊 JSON data size:", jsonSize, "bytes");
+
+    const { blob, commitment } = JsonBlobUtils.createBlobFromJSONFile(filePath);
+    const versionedHash = JsonBlobUtils.createVersionedHash(commitment);
+
+    console.log("🔗 Blob commitment:", commitment);
+    console.log("🆔 Versioned hash:", versionedHash);
+
+    return this.executeBlobTransaction(blob, versionedHash);
+  }
+
+  private async executeBlobTransaction(blob: Uint8Array, versionedHash: string): Promise<string> {
+    if (!this.merkleRegistryContract) {
+      throw new Error("MerkleRootBlobRegistry not connected");
+    }
+
+    await this.checkPendingTransactions();
+
+    const [feeData, blobBaseFee] = await Promise.all([
+      this.signer.provider.getFeeData(),
+      BlobUtils.calculateBlobGasPrice(this.signer.provider)
+    ]);
+
+    if (!feeData.maxFeePerGas || !feeData.maxPriorityFeePerGas) {
+      throw new Error("Unable to fetch gas prices");
+    }
+
+    const fees = BlobUtils.calculateFees(feeData.maxFeePerGas, blobBaseFee);
+    console.log(`💰 Total fee: ${ethers.formatEther(fees.totalFee)} ETH`);
+
+    // Convert current merkle root to bytes32 format
+    const currentRoot = this.tree.getRoot();
+    const rootBytes32 = `0x${BigInt(currentRoot).toString(16).padStart(64, "0")}`;
+
+    // Prepare the contract call data for updateMerkleRoot
+    const callData = this.merkleRegistryContract.interface.encodeFunctionData("updateMerkleRoot", [rootBytes32]);
+
+    // Use static gas limit for blob transactions since gas estimation doesn't work with blobs
+    // The updateMerkleRoot function is simple and should use around 50-70k gas
+    const gasLimit = BigInt(200000); // 200k gas to ensure we don't hit gas limit
+
+    const transaction = {
+      type: 3,
+      to: await this.merkleRegistryContract.getAddress(),
+      value: 0,
+      data: callData,
+      gasLimit: gasLimit,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+      maxFeePerBlobGas: blobBaseFee * GAS_CONFIG.BLOB_GAS_MULTIPLIER,
+      blobVersionedHashes: [versionedHash],
+      blobs: [blob],
+      kzg
+    };
+
+    console.log(`📤 Sending blob transaction to MerkleRootBlobRegistry: ${transaction.to}`);
+    console.log(`📝 Updating merkle root: ${rootBytes32}`);
+    console.log(`⛽ Gas limit: ${gasLimit}`);
+    console.log(`📊 Call data: ${callData}`);
+    console.log(`📊 Transaction data field: ${transaction.data}`);
+    console.log(`📊 Blob versioned hashes: ${JSON.stringify(transaction.blobVersionedHashes)}`);
+    console.log(`📊 Number of blobs: ${transaction.blobs ? transaction.blobs.length : 0}`);
+
+    // Verify contract ownership before sending
+    const contractOwner = await this.merkleRegistryContract.owner();
+    const signerAddress = await this.signer.getAddress();
+    console.log(`📋 Contract owner: ${contractOwner}`);
+    console.log(`📋 Signer address: ${signerAddress}`);
+    console.log(`📋 Owner match: ${contractOwner.toLowerCase() === signerAddress.toLowerCase()}`);
+
+    try {
+      const response = await this.signer.sendTransaction(transaction);
+      const receipt = await response.wait();
+
+      if (!receipt) throw new Error("Transaction failed");
+
+      console.log(`✨ Confirmed in block: ${receipt.blockNumber}`);
+      console.log(`⛽ Gas used: ${receipt.gasUsed}`);
+      console.log(`✅ Merkle root updated on MerkleRootBlobRegistry with blob data`);
+      return response.hash;
+    } catch (error) {
+      console.error("❌ Blob transaction failed:", error);
+      if (error instanceof Error && error.message.includes("could not coalesce error")) {
+        throw new Error("Blob transaction failed - possibly due to network issues or blob format problems. Try again.");
+      }
+      throw error;
+    }
+  }
+
+  private async checkPendingTransactions(): Promise<void> {
+    const [currentNonce, pendingNonce] = await Promise.all([
+      this.signer.provider.getTransactionCount(this.signer.address),
+      this.signer.provider.getTransactionCount(this.signer.address, 'pending')
+    ]);
+
+    console.log(`🔍 Nonce check: current=${currentNonce}, pending=${pendingNonce}`);
+
+    if (pendingNonce > currentNonce) {
+      const pendingCount = pendingNonce - currentNonce;
+      throw new Error(
+        `❌ Cannot send transaction: ${pendingCount} pending transaction(s) blocking the queue. ` +
+        `Wait for pending transactions to clear or use a different wallet.`
+      );
+    }
+
+    console.log(`✅ No pending transactions - proceeding with nonce ${currentNonce}`);
   }
 }
 
