@@ -3,9 +3,12 @@
     "version": "1.0.0",
     "description": "IMPORTANT: Always use utils/contractLoader.ts for contract interactions",
     "scripts": {
+        "build": "echo 'Build complete'",
+        "start": "ts-node minimalOracle.ts",
         "purchase-policy": "ts-node purchasePolicy.ts",
         "claim-policy": "ts-node claimPolicy.ts",
-        "oracle:minimal": "ts-node minimalOracle.ts"
+        "oracle:minimal": "ts-node minimalOracle.ts",
+        "prepare-railway": "cp ../contracts/deployment.json ./deployment.json && mkdir -p contracts/out && cp -r ../contracts/out/InsuranceVault.sol ../contracts/out/Token.sol ../contracts/out/Groth16Verifier.sol ./contracts/out/"
     },
     "dependencies": {
         "@openzeppelin/merkle-tree": "^1.0.8",

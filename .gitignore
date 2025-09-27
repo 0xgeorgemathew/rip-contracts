@@ -5,12 +5,13 @@ cache/
 out/
 
 # Ignores development broadcast logs
-broadcast/
-contracts/broadcast/
-**/broadcast/
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+broadcast
+contracts/broadcast/DeployScript.sol/
 **/run-*.json
-**/run-latest.json
-
+contracts/broadcast/DeployScript.sol/11155111/run-latest.json
 # Docs
 docs/
 
@@ -23,3 +24,10 @@ lib/
 .DS_Store
 .bmad-core
 .claude
+contracts/broadcast/DeployScript.sol/11155111/run-latest.json
+
+# Allow Railway deployment files
+!scripts/deployment.json
+!scripts/contracts/
+!scripts/contracts/out/
+!scripts/contracts/out/**/*.json

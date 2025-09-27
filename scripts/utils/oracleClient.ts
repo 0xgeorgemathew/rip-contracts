@@ -26,7 +26,9 @@ export interface OracleMerkleProof {
 }
 
 export class OracleClient {
-  constructor(private baseUrl = "http://localhost:3001") {}
+  constructor(private baseUrl = process.env.RAILWAY === "TRUE"
+    ? "https://loving-elegance-production.up.railway.app"
+    : "http://localhost:3001") {}
 
   async checkConnection(): Promise<boolean> {
     try {

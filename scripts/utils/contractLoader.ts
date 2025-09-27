@@ -5,14 +5,23 @@ import * as path from "path";
  * Load contract ABI from compiled contract artifacts
  */
 export async function loadContractABI(contractName: string): Promise<any[]> {
-  const abiPath = path.join(__dirname, `../../contracts/out/${contractName}.sol/${contractName}.json`);
+  // Try original path first (for local development)
+  let abiPath = path.join(__dirname, `../../contracts/out/${contractName}.sol/${contractName}.json`);
 
   try {
     const contractData = await fs.readFile(abiPath, "utf-8");
     const parsed = JSON.parse(contractData);
     return parsed.abi;
-  } catch (error) {
-    throw new Error(`Failed to load ABI for ${contractName}: ${error}`);
+  } catch {
+    try {
+      // Fallback to local contracts folder (for Railway)
+      abiPath = path.join(__dirname, `../contracts/out/${contractName}.sol/${contractName}.json`);
+      const contractData = await fs.readFile(abiPath, "utf-8");
+      const parsed = JSON.parse(contractData);
+      return parsed.abi;
+    } catch (error) {
+      throw new Error(`Failed to load ABI for ${contractName}: ${error}`);
+    }
   }
 }
 
@@ -27,15 +36,23 @@ export async function loadDeploymentAddresses(): Promise<{
   timestamp?: string;
 }> {
   try {
+    // Try original path first (for local development)
     const deploymentPath = path.join(__dirname, "../../contracts/deployment.json");
     const deploymentData = await fs.readFile(deploymentPath, "utf-8");
     return JSON.parse(deploymentData);
-  } catch (error) {
-    console.log("Could not load deployment.json, using environment variables");
-    return {
-      vault: process.env.CONTRACT_ADDRESS,
-      verifier: process.env.VERIFIER_ADDRESS,
-    };
+  } catch {
+    try {
+      // Fallback to local deployment.json (for Railway)
+      const deploymentPath = path.join(__dirname, "../deployment.json");
+      const deploymentData = await fs.readFile(deploymentPath, "utf-8");
+      return JSON.parse(deploymentData);
+    } catch (error) {
+      console.log("Could not load deployment.json, using environment variables");
+      return {
+        vault: process.env.CONTRACT_ADDRESS,
+        verifier: process.env.VERIFIER_ADDRESS,
+      };
+    }
   }
 }
 
