@@ -95,10 +95,9 @@ class MinimalPriceOracle {
       const deployment = await loadDeploymentAddresses();
       if (!deployment.vault) throw new Error("Vault address not found");
       this.contract = await getContractInstance("InsuranceVault", deployment.vault, this.signer);
-      await this.contract.getContractBalance();
       console.log("Contract connected:", deployment.vault);
     } catch (error) {
-      console.log("Contract connection failed - running in local-only mode");
+      console.log("Contract connection failed - running in local-only mode:", error);
     }
   }
 
