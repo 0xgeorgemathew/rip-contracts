@@ -161,3 +161,64 @@ export interface HealthCheck {
   percentage: number;
   status: 'excellent' | 'good' | 'poor';
 }
+
+// ============================================================================
+// KNOWLEDGE GRAPH TYPES (for Hypergraph GRC-20 integration)
+// ============================================================================
+
+/**
+ * Knowledge Graph integration status
+ * Used in: Knowledge Graph routes for system monitoring
+ */
+export interface KnowledgeGraphStatus {
+  isReady: boolean;
+  queuedItems: number;
+  isPublishing?: boolean;
+}
+
+/**
+ * Knowledge Graph query cache statistics
+ * Used in: Knowledge Graph query interface for cache management
+ */
+export interface QueryCacheStats {
+  totalEntries: number;
+  validEntries: number;
+  cacheHitRatio?: number;
+}
+
+/**
+ * Price drop alert information from Knowledge Graph
+ * Used in: Knowledge Graph queries for price drop analysis
+ */
+export interface PriceDropAlert {
+  productId: string;
+  name: string;
+  oldPrice: number;
+  newPrice: number;
+  dropPercent: number;
+  timestamp: string;
+}
+
+/**
+ * Oracle activity timeline entry
+ * Used in: Knowledge Graph queries for oracle activity tracking
+ */
+export interface OracleActivityTimeline {
+  timestamp: string;
+  type: 'update' | 'merkle' | 'drop';
+  productId?: string;
+  description: string;
+  txHash?: string;
+}
+
+/**
+ * Market overview summary data
+ * Used in: Knowledge Graph queries for market intelligence
+ */
+export interface MarketOverview {
+  totalProducts: number;
+  recentDrops: number;
+  avgDrop: number;
+  lastUpdate: string;
+  topDrops: PriceDropAlert[];
+}
