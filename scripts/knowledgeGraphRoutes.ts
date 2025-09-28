@@ -29,12 +29,14 @@ export function createKnowledgeGraphRoutes(oracle: MinimalPriceOracle): Router {
    */
   router.post('/refresh', async (req: Request, res: Response) => {
     try {
-      // Get essential data from oracle
+      // Get essential data from oracle including transaction information
       const liveData = {
         products: oracle.getAllPrices(),
         merkleRoot: oracle.getMerkleRootSync(),
         isInitialized: oracle.isInitialized,
-        blockNumber: undefined
+        blockNumber: undefined,
+        lastTransaction: oracle.lastTransaction,
+        lastBlobTransaction: oracle.lastBlobTransaction
       };
 
       // Get current block number from the blockchain

@@ -52,6 +52,7 @@ export interface OracleActivityTimeline {
   productId?: string;
   details: string;
   blockNumber?: number;
+  txHash?: string;
 }
 
 export interface MarketOverview {
@@ -497,7 +498,8 @@ export class KnowledgeGraphQuery {
         timestamp: new Date().toISOString(),
         type: 'merkle',
         details: `Updated merkle root for ${this.liveOracleData.products.length} products`,
-        blockNumber: this.liveOracleData.lastBlobTransaction?.blockNumber || this.liveOracleData.blockNumber
+        blockNumber: this.liveOracleData.lastBlobTransaction?.blockNumber || this.liveOracleData.blockNumber,
+        txHash: blobTxHash
       });
 
       // Add price update activities for products that have changed
@@ -511,17 +513,21 @@ export class KnowledgeGraphQuery {
             type: 'drop',
             productId: product.id,
             details: `Price drop: ${product.name} ${((product.basePrice - product.currentPrice) / product.basePrice * 100).toFixed(1)}%`,
-            blockNumber: this.liveOracleData.lastTransaction?.blockNumber || this.liveOracleData.blockNumber
+            blockNumber: this.liveOracleData.lastTransaction?.blockNumber || this.liveOracleData.blockNumber,
+            txHash: dropTxHash
           });
         }
       });
 
       // Add system initialization if oracle is initialized
       if (this.liveOracleData.isInitialized) {
+        const initTxHash = this.liveOracleData.lastTransaction?.txHash || this.generateMockTxHash();
         result.push({
           timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
           type: 'update',
-          details: `Oracle initialized with ${this.liveOracleData.products.length} products`
+          details: `Oracle initialized with ${this.liveOracleData.products.length} products`,
+          blockNumber: this.liveOracleData.lastTransaction?.blockNumber || this.liveOracleData.blockNumber,
+          txHash: initTxHash
         });
       }
 
