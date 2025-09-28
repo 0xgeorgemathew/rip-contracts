@@ -810,12 +810,12 @@
                     const html = drops.map(drop => `
                         <div class="product-item">
                             <div>
-                                <div class="product-name">${drop.productName}</div>
+                                <div class="product-name">${drop.name}</div>
                                 <div style="font-size: 0.8rem; color: #6b7280;">
                                     $${(drop.oldPrice / 1000000).toFixed(2)} → $${(drop.newPrice / 1000000).toFixed(2)}
                                 </div>
                             </div>
-                            <div class="price-change negative">-${drop.dropPercentage.toFixed(1)}%</div>
+                            <div class="price-change negative">-${drop.dropPercent.toFixed(1)}%</div>
                         </div>
                     `).join('');
                     
@@ -843,19 +843,25 @@
                     }
                     
                     const html = activities.slice(0, 5).map(activity => {
-                        console.log('Activity:', activity); // Debug log
+                        // Map activity types to user-friendly names
+                        const typeDisplayNames = {
+                            'merkle_update': 'MERKLE UPDATE EVENT',
+                            'price_drop': 'PRICE DROP EVENT'
+                        };
+                        const displayName = typeDisplayNames[activity.type] || activity.type.replace(/-/g, ' ').toUpperCase();
+                        
                         return `
                         <div class="product-item">
                             <div>
-                                <div class="product-name">${activity.activityType.replace('_', ' ').toUpperCase()}</div>
+                                <div class="product-name">${displayName}</div>
                                 <div style="font-size: 0.8rem; color: #6b7280;">
                                     ${activity.productId || 'System'} • ${new Date(activity.timestamp).toLocaleTimeString()}
                                 </div>
                             </div>
                             <div style="font-size: 0.8rem;">
-                                ${activity.transactionHash ?
-                                    `<a href="https://sepolia.etherscan.io/tx/${activity.transactionHash}" target="_blank" class="tx-link">
-                                        ${activity.details?.blobTransaction ? '🗄️' : '📄'} ${activity.transactionHash.substring(0, 10)}...
+                                ${activity.txHash ?
+                                    `<a href="https://sepolia.etherscan.io/tx/${activity.txHash}" target="_blank" class="tx-link">
+                                        📄 ${activity.txHash.substring(0, 10)}...
                                     </a>` :
                                     `<span style="color: #667eea;">Block ${activity.blockNumber || 'Pending'}</span>`
                                 }

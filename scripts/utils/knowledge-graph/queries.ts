@@ -48,7 +48,7 @@ export interface PriceDropAlert {
 
 export interface OracleActivityTimeline {
   timestamp: string;
-  type: 'update' | 'merkle' | 'drop';
+  type: 'merkle_update' | 'price_drop';
   productId?: string;
   details: string;
   blockNumber?: number;
@@ -496,7 +496,7 @@ export class KnowledgeGraphQuery {
 
       result.push({
         timestamp: new Date().toISOString(),
-        type: 'merkle',
+        type: 'merkle_update',
         details: `Updated merkle root for ${this.liveOracleData.products.length} products`,
         blockNumber: this.liveOracleData.lastBlobTransaction?.blockNumber || this.liveOracleData.blockNumber,
         txHash: blobTxHash
@@ -510,26 +510,16 @@ export class KnowledgeGraphQuery {
 
           result.push({
             timestamp: new Date(Date.now() - (index + 1) * 60 * 1000).toISOString(), // Stagger timestamps
-            type: 'drop',
+            type: 'price_drop',
             productId: product.id,
-            details: `Price drop: ${product.name} ${((product.basePrice - product.currentPrice) / product.basePrice * 100).toFixed(1)}%`,
+            details: `Price Drop Event: ${product.name} decreased by ${((product.basePrice - product.currentPrice) / product.basePrice * 100).toFixed(1)}%`,
             blockNumber: this.liveOracleData.lastTransaction?.blockNumber || this.liveOracleData.blockNumber,
             txHash: dropTxHash
           });
         }
       });
 
-      // Add system initialization if oracle is initialized
-      if (this.liveOracleData.isInitialized) {
-        const initTxHash = this.liveOracleData.lastTransaction?.txHash || this.generateMockTxHash();
-        result.push({
-          timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-          type: 'update',
-          details: `Oracle initialized with ${this.liveOracleData.products.length} products`,
-          blockNumber: this.liveOracleData.lastTransaction?.blockNumber || this.liveOracleData.blockNumber,
-          txHash: initTxHash
-        });
-      }
+      
 
       // Sort by timestamp, most recent first
       result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
