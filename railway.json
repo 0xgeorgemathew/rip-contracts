@@ -1,0 +1,15 @@
+{
+  "deploy": {
+    "startCommand": "cd scripts && npm install && npx ts-node minimalOracle.ts",
+    "healthcheckPath": "/api/debug/status",
+    "restartPolicyType": "always"
+  },
+  "build": {
+    "builder": "nixpacks",
+    "buildCommand": "cd scripts && npm install"
+  },
+  "environment": {
+    "NODE_ENV": "production",
+    "PORT": "4001"
+  }
+}
