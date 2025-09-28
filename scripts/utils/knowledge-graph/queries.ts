@@ -495,7 +495,7 @@ export class KnowledgeGraphQuery {
       const blobTxHash = this.liveOracleData.lastBlobTransaction?.txHash || this.generateMockTxHash();
 
       result.push({
-        timestamp: new Date().toISOString(),
+        timestamp: this.liveOracleData.timestamp || new Date().toISOString(),
         type: 'merkle_update',
         details: `Updated merkle root for ${this.liveOracleData.products.length} products`,
         blockNumber: this.liveOracleData.lastBlobTransaction?.blockNumber || this.liveOracleData.blockNumber,
@@ -508,8 +508,9 @@ export class KnowledgeGraphQuery {
           // Generate unique transaction hash for each price drop
           const dropTxHash = this.liveOracleData.lastTransaction?.txHash || this.generateMockTxHash();
 
+          const baseTimestamp = this.liveOracleData.timestamp ? new Date(this.liveOracleData.timestamp).getTime() : Date.now();
           result.push({
-            timestamp: new Date(Date.now() - (index + 1) * 60 * 1000).toISOString(), // Stagger timestamps
+            timestamp: new Date(baseTimestamp - (index + 1) * 60 * 1000).toISOString(), // Stagger timestamps before Oracle update
             type: 'price_drop',
             productId: product.id,
             details: `Price Drop Event: ${product.name} decreased by ${((product.basePrice - product.currentPrice) / product.basePrice * 100).toFixed(1)}%`,
