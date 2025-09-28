@@ -14,6 +14,7 @@ import { retryWithBackoff } from "./utils/retryUtils";
 import { logAvailableRoutes } from "./utils/routeLogger";
 import { OracleStateManager } from "./utils/stateManager";
 import { buildMerkleTreeFromProducts, ProperMerkleTree } from "./utils/treeBuilder";
+import { KnowledgeGraphPublisher } from "./utils/knowledge-graph/publisher";
 import express = require("express");
 
 dotenv.config();
@@ -49,6 +50,9 @@ class MinimalPriceOracle {
   private productHashMap = new Map<string, string>();
   private leafHashMap = new Map<string, string>();
   private stateManager = new OracleStateManager(TREE_FILE_PATH);
+  private knowledgeGraph = new KnowledgeGraphPublisher();
+  private lastTransactionInfo: { txHash: string; blockNumber: number } | null = null;
+  private lastBlobTransactionInfo: { txHash: string; blockNumber: number } | null = null;
 
   constructor() {
     this.currentPrices = new Map(this.products.map((p) => [p.id, p.basePrice]));
@@ -62,6 +66,11 @@ class MinimalPriceOracle {
     await this.initializeTreeState();
     await this.initContract();
     await this.syncChainWithLocal();
+    
+    // Initialize Knowledge Graph integration
+    await this.knowledgeGraph.initialize();
+    await this.publishInitialDataToKnowledgeGraph();
+    
     this.initialized = true;
     console.log("✅ Oracle initialized with merkle root:", this.getMerkleRootSync());
   }
@@ -247,16 +256,38 @@ class MinimalPriceOracle {
 
   async dropAllPrices(percentage: number = 10): Promise<void> {
     this.ensureInitialized();
+    
     for (const product of this.products) {
       const currentPrice = this.currentPrices.get(product.id)!;
-      this.currentPrices.set(product.id, Math.floor(currentPrice * (1 - percentage / 100)));
+      const newPrice = Math.floor(currentPrice * (1 - percentage / 100));
+      this.currentPrices.set(product.id, newPrice);
+      
+      // Publish individual price drop to Knowledge Graph
+      await this.publishPriceDropToKnowledgeGraph(
+        product.id,
+        currentPrice,
+        newPrice
+      );
     }
+    
     await this.updateTreeAndChain();
   }
 
   async setProductPrice(productId: string, price: number): Promise<void> {
     this.ensureInitialized();
+    const oldPrice = this.currentPrices.get(productId);
+    
     this.currentPrices.set(productId, price);
+    
+    // Publish price change to Knowledge Graph if there was an old price
+    if (oldPrice && oldPrice !== price) {
+      await this.publishPriceDropToKnowledgeGraph(
+        productId,
+        oldPrice,
+        price
+      );
+    }
+    
     await this.updateTreeAndChain();
   }
 
@@ -289,8 +320,8 @@ class MinimalPriceOracle {
       if (this.merkleRegistryContract) {
         try {
           console.log("📦 Storing updated merkle tree data as EIP-4844 blob...");
-          const txHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
-          console.log(`✅ Blob transaction successful: ${txHash}`);
+          const blobTxHash = await this.sendJSONFileTransaction(TREE_FILE_PATH);
+          console.log(`✅ Blob transaction successful: ${blobTxHash}`);
         } catch (error) {
           console.error("❌ Blob storage failed:", error);
           // Don't throw - blob storage is not critical for oracle operation
@@ -305,6 +336,59 @@ class MinimalPriceOracle {
     }
   }
 
+  // ============================================================================
+  // KNOWLEDGE GRAPH INTEGRATION METHODS
+  // ============================================================================
+
+  /**
+   * Publish initial product catalog and state to Knowledge Graph
+   */
+  private async publishInitialDataToKnowledgeGraph(): Promise<void> {
+    try {
+      // Publish product catalog
+      await this.knowledgeGraph.publishProductCatalog(this.products);
+      
+      // Publish initial price state
+      await this.knowledgeGraph.publishPriceState(
+        this.currentPrices, 
+        this.products, 
+        this.leafHashMap
+      );
+      
+      // Publish initial merkle root
+      if (this.tree) {
+        await this.knowledgeGraph.publishMerkleRootUpdate(
+          this.tree.getRoot(),
+          this.products.length
+        );
+      }
+      
+      console.log("✅ Initial data published to Knowledge Graph");
+    } catch (error) {
+      console.warn("⚠️  Failed to publish initial data to Knowledge Graph:", error);
+    }
+  }
+
+  /**
+   * Publish price drop event to Knowledge Graph (called during price updates)
+   */
+  private async publishPriceDropToKnowledgeGraph(
+    productId: string, 
+    oldPrice: number, 
+    newPrice: number
+  ): Promise<void> {
+    try {
+      await this.knowledgeGraph.publishPriceDropEvent(
+        productId,
+        oldPrice,
+        newPrice,
+        this.products
+      );
+    } catch (error) {
+      console.warn(`⚠️  Failed to publish price drop for ${productId} to Knowledge Graph:`, error);
+    }
+  }
+
   get isInitialized(): boolean {
     return this.initialized;
   }
@@ -313,6 +397,22 @@ class MinimalPriceOracle {
   }
   get isContractConnected(): boolean {
     return !!this.contract;
+  }
+  get knowledgeGraphStatus(): { isReady: boolean; queuedItems: number } {
+    const stats = this.knowledgeGraph.getQueueStats();
+    return {
+      isReady: stats.isReady,
+      queuedItems: stats.queuedItems
+    };
+  }
+  get provider(): any {
+    return this.signer?.provider || null;
+  }
+  get lastTransaction(): { txHash: string; blockNumber: number } | null {
+    return this.lastTransactionInfo;
+  }
+  get lastBlobTransaction(): { txHash: string; blockNumber: number } | null {
+    return this.lastBlobTransactionInfo;
   }
 
   async getContractAddress(): Promise<string | null> {
@@ -436,6 +536,13 @@ class MinimalPriceOracle {
       console.log(`✨ Confirmed in block: ${receipt.blockNumber}`);
       console.log(`⛽ Gas used: ${receipt.gasUsed}`);
       console.log(`✅ Merkle root updated on MerkleRootBlobRegistry with blob data`);
+      
+      // Update blob transaction info with actual receipt data
+      this.lastBlobTransactionInfo = {
+        txHash: response.hash,
+        blockNumber: receipt.blockNumber
+      };
+      
       return response.hash;
     } catch (error) {
       console.error("❌ Blob transaction failed:", error);
@@ -480,8 +587,15 @@ async function startServer() {
     next();
   });
 
+  // Serve static dashboard files
+  app.use(express.static('./public'));
+
   app.use("/api", createApiRoutes(oracle));
   app.use("/api/debug", createDebugRoutes(oracle));
+  
+  // Import and add Knowledge Graph routes
+  const { createKnowledgeGraphRoutes } = await import("./knowledgeGraphRoutes");
+  app.use("/api/kg", createKnowledgeGraphRoutes(oracle));
 
   const PORT = process.env.PORT || 3001;
   const server = app.listen(PORT, () => {
