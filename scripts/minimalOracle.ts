@@ -343,11 +343,18 @@ class MinimalPriceOracle {
 
   private async loadMerkleRegistryAddresses(): Promise<{ merkleRegistry?: string }> {
     try {
+      // Try original path first (for local development)
       const deploymentData = fs.readFileSync("../contracts/merkle-registry-deployment.json", "utf8");
       return JSON.parse(deploymentData);
-    } catch (error) {
-      console.log("⚠️  MerkleRootBlobRegistry deployment not found - blob transactions will be disabled");
-      return {};
+    } catch {
+      try {
+        // Fallback to local deployment.json (for Railway)
+        const deploymentData = fs.readFileSync("./merkle-registry-deployment.json", "utf8");
+        return JSON.parse(deploymentData);
+      } catch (error) {
+        console.log("⚠️  MerkleRootBlobRegistry deployment not found - blob transactions will be disabled");
+        return {};
+      }
     }
   }
 
