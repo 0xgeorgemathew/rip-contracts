@@ -22,7 +22,7 @@ EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:4001/api/debug/status || exit 1
+    CMD curl -f http://localhost:3001/api/debug/status || exit 1
 
 # Start the Oracle
 CMD ["npx", "ts-node", "minimalOracle.ts"]
