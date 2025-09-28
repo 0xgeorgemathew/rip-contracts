@@ -33,3 +33,5 @@ contracts/broadcast/DeployScript.sol/11155111/run-latest.json
 !scripts/contracts/out/**/*.json
 
 oracle.log
+
+/Docs
