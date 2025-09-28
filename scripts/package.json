@@ -3,8 +3,10 @@
     "version": "1.0.0",
     "description": "IMPORTANT: Always use utils/contractLoader.ts for contract interactions",
     "scripts": {
-        "build": "echo 'Build complete'",
-        "start": "ts-node minimalOracle.ts",
+        "build": "tsc --outDir dist",
+        "start": "node --max-old-space-size=1024 dist/minimalOracle.js",
+        "start:dev": "ts-node minimalOracle.ts",
+        "start:memory": "node --max-old-space-size=1024 -r ts-node/register minimalOracle.ts",
         "purchase-policy": "ts-node purchasePolicy.ts",
         "claim-policy": "ts-node claimPolicy.ts",
         "oracle:minimal": "ts-node minimalOracle.ts",
