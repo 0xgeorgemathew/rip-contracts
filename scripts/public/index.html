@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Graph Price Intelligence Hub</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                🧠 Knowledge Graph Price Intelligence Hub
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+                <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Main Dashboard -->
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">
+                    💰 Current Prices
+                </div>
+                <div class="product-list" id="currentPrices">
+                    <div class="loading">Loading prices...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    📉 Recent Price Drops
+                </div>
+                <div class="product-list" id="recentDrops">
+                    <div class="loading">Loading price drops...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    🔄 Oracle Activity
+                </div>
+                <div class="product-list" id="oracleActivity">
+                    <div class="loading">Loading activity...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price History Chart -->
+        <div class="card">
+            <div class="card-title">
+                📈 Price Trends - All 8 Products (Last 30 Days)
+            </div>
+            <div class="chart-container">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Knowledge Graph API Documentation -->
+        <div class="api-section">
+            <h2 style="margin-bottom: 1rem; color: #374151;">🔗 Knowledge Graph APIs</h2>
+            <p style="margin-bottom: 1.5rem; color: #6b7280;">
+                
+            </p>
+
+            <!-- Products APIs -->
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/products/current-prices', 'api1')">
+                <span class="method-get">GET</span> /api/kg/products/current-prices
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get real-time prices for all products</div>
+            </div>
+            <div id="api1-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/products/MACBOOK/history?timeframe=30d', 'api2')">
+                <span class="method-get">GET</span> /api/kg/products/MACBOOK/history?timeframe=30d
+                <div style="color: #6b7280; margin-top: 0.25rem;">Historical price data for MacBook Pro M3</div>
+            </div>
+            <div id="api2-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/products/search?q=MacBook', 'api3')">
+                <span class="method-get">GET</span> /api/kg/products/search?q=MacBook
+                <div style="color: #6b7280; margin-top: 0.25rem;">Search products by name or category</div>
+            </div>
+            <div id="api3-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <!-- Price Drop APIs -->
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/price-drops/recent?timeframe=24h', 'api4')">
+                <span class="method-get">GET</span> /api/kg/price-drops/recent?timeframe=24h
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get recent price drops across all products</div>
+            </div>
+            <div id="api4-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/price-drops/IPADAIR?timeframe=7d', 'api5')">
+                <span class="method-get">GET</span> /api/kg/price-drops/IPADAIR?timeframe=7d
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get price drops for iPad Air (last 7 days)</div>
+            </div>
+            <div id="api5-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <!-- Oracle APIs -->
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/oracle/activity?timeframe=24h', 'api6')">
+                <span class="method-get">GET</span> /api/kg/oracle/activity?timeframe=24h
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get Oracle activity timeline</div>
+            </div>
+            <div id="api6-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/oracle/merkle-root', 'api7')">
+                <span class="method-get">GET</span> /api/kg/oracle/merkle-root
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get current merkle root information</div>
+            </div>
+            <div id="api7-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <!-- Market & Trends APIs -->
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/market/overview', 'api8')">
+                <span class="method-get">GET</span> /api/kg/market/overview
+                <div style="color: #6b7280; margin-top: 0.25rem;">Market intelligence for trading platforms</div>
+            </div>
+            <div id="api8-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/price-trends?timeframe=30d&limit=4', 'api9')">
+                <span class="method-get">GET</span> /api/kg/price-trends?timeframe=30d&limit=4
+                <div style="color: #6b7280; margin-top: 0.25rem;">Price trend data for charting (top 4 products)</div>
+            </div>
+            <div id="api9-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <!-- System APIs -->
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/status', 'api10')">
+                <span class="method-get">GET</span> /api/kg/status
+                <div style="color: #6b7280; margin-top: 0.25rem;">Knowledge Graph integration status</div>
+            </div>
+            <div id="api10-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+            <div class="api-endpoint clickable-endpoint" onclick="callAPI('/api/kg/cache/stats', 'api11')">
+                <span class="method-get">GET</span> /api/kg/cache/stats
+                <div style="color: #6b7280; margin-top: 0.25rem;">Get Knowledge Graph cache statistics</div>
+            </div>
+            <div id="api11-response" class="api-response-area" style="display: none;">
+                <h4 style="color: #374151; margin: 0.5rem 0;">Response:</h4>
+                <pre class="api-response-content"></pre>
+            </div>
+
+
+        </div>
+    </div>
+
+    <div class="footer">
+        Built with Hypergraph Framework & GRC-20 Standard | Zero-Knowledge Price Protection + Knowledge Graph Intelligence
+    </div>
+
+   
+</body>
+</html>
