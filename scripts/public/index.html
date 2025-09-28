@@ -180,7 +180,392 @@
     <div class="footer">
         Built with Hypergraph Framework & GRC-20 Standard | Zero-Knowledge Price Protection + Knowledge Graph Intelligence
     </div>
+     <script>
+        let priceChart = null;
+        let chartFilterState = null; // Store user's filtering preferences
+        
+        // API Base URL
+        const API_BASE = window.location.origin;
+        
+        // Initialize dashboard
+        async function initDashboard() {
+            try {
+                await refreshData();
+                updateStatus('connected', 'Knowledge Graph Connected');
+                
+                // Set up auto-refresh every 30 seconds for real-time updates (less frequent to preserve user interactions)
+                setInterval(refreshData, 30000);
+            } catch (error) {
+                console.error('Dashboard initialization failed:', error);
+                updateStatus('error', 'Connection Failed');
+            }
+        }
+        
+        // Update connection status
+        function updateStatus(status, text) {
+            const dot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            dot.style.background = status === 'connected' ? '#10b981' : 
+                                 status === 'error' ? '#ef4444' : '#f59e0b';
+            statusText.textContent = text;
+        }
+        
+        // Refresh all data
+        async function refreshData() {
+            updateStatus('loading', 'Refreshing...');
+            
+            try {
+                // First refresh the Knowledge Graph data
+                await refreshKnowledgeGraphData();
+                
+                // Then reload all dashboard components
+                await Promise.all([
+                    loadCurrentPrices(),
+                    loadRecentDrops(),
+                    loadOracleActivity(),
+                    loadPriceChart()
+                ]);
+                
+                updateStatus('connected', 'Knowledge Graph Connected');
+            } catch (error) {
+                console.error('Refresh failed:', error);
+                updateStatus('error', 'Refresh Failed');
+            }
+        }
 
+        // Refresh Knowledge Graph data from Oracle
+        async function refreshKnowledgeGraphData() {
+            try {
+                const response = await fetch('/api/kg/refresh', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                console.log('✅ Knowledge Graph refreshed:', result);
+                return result;
+            } catch (error) {
+                console.warn('Failed to refresh Knowledge Graph (using cached data):', error);
+            }
+        }
+        
+        
+        // Load current prices
+        async function loadCurrentPrices() {
+            try {
+                const response = await fetch(`${API_BASE}/api/kg/products/current-prices`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const prices = data.data;
+                    const html = prices.map(item => `
+                        <div class="product-item">
+                            <div class="product-name">${item.name}</div>
+                            <div class="price">$${(item.price / 1000000).toFixed(2)}</div>
+                        </div>
+                    `).join('');
+                    
+                    document.getElementById('currentPrices').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('currentPrices').innerHTML = 
+                    '<div class="error">Failed to load current prices</div>';
+            }
+        }
+        
+        // Load recent price drops
+        async function loadRecentDrops() {
+            try {
+                const response = await fetch(`${API_BASE}/api/kg/price-drops/recent?timeframe=24h`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const drops = data.data;
+                    
+                    if (drops.length === 0) {
+                        document.getElementById('recentDrops').innerHTML = 
+                            '<div style="text-align: center; color: #6b7280; padding: 1rem;">No recent price drops</div>';
+                        return;
+                    }
+                    
+                    const html = drops.map(drop => `
+                        <div class="product-item">
+                            <div>
+                                <div class="product-name">${drop.productName}</div>
+                                <div style="font-size: 0.8rem; color: #6b7280;">
+                                    $${(drop.oldPrice / 1000000).toFixed(2)} → $${(drop.newPrice / 1000000).toFixed(2)}
+                                </div>
+                            </div>
+                            <div class="price-change negative">-${drop.dropPercentage.toFixed(1)}%</div>
+                        </div>
+                    `).join('');
+                    
+                    document.getElementById('recentDrops').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('recentDrops').innerHTML = 
+                    '<div class="error">Failed to load price drops</div>';
+            }
+        }
+        
+        // Load oracle activity
+        async function loadOracleActivity() {
+            try {
+                const response = await fetch(`${API_BASE}/api/kg/oracle/activity?timeframe=24h`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const activities = data.data;
+                    
+                    if (activities.length === 0) {
+                        document.getElementById('oracleActivity').innerHTML = 
+                            '<div style="text-align: center; color: #6b7280; padding: 1rem;">No recent activity</div>';
+                        return;
+                    }
+                    
+                    const html = activities.slice(0, 5).map(activity => {
+                        console.log('Activity:', activity); // Debug log
+                        return `
+                        <div class="product-item">
+                            <div>
+                                <div class="product-name">${activity.activityType.replace('_', ' ').toUpperCase()}</div>
+                                <div style="font-size: 0.8rem; color: #6b7280;">
+                                    ${activity.productId || 'System'} • ${new Date(activity.timestamp).toLocaleTimeString()}
+                                </div>
+                            </div>
+                            <div style="font-size: 0.8rem;">
+                                ${activity.transactionHash ?
+                                    `<a href="https://sepolia.etherscan.io/tx/${activity.transactionHash}" target="_blank" class="tx-link">
+                                        ${activity.details?.blobTransaction ? '🗄️' : '📄'} ${activity.transactionHash.substring(0, 10)}...
+                                    </a>` :
+                                    `<span style="color: #667eea;">Block ${activity.blockNumber || 'Pending'}</span>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                    }).join('');
+                    
+                    document.getElementById('oracleActivity').innerHTML = html;
+                }
+            } catch (error) {
+                document.getElementById('oracleActivity').innerHTML = 
+                    '<div class="error">Failed to load oracle activity</div>';
+            }
+        }
+
+
+        // Load and create price chart with real data
+        async function loadPriceChart() {
+            try {
+                // Get price trends for ALL 8 products from Knowledge Graph
+                const trendsResponse = await fetch(`${API_BASE}/api/kg/price-trends?timeframe=30d&limit=8`);
+                const trendsData = await trendsResponse.json();
+
+                if (!trendsData.success) {
+                    throw new Error('Failed to load price trends');
+                }
+
+                const trends = trendsData.data;
+                const chartData = {
+                    labels: trends[0]?.labels || ['30d ago', '25d ago', '20d ago', '15d ago', '10d ago', '5d ago', 'Today'],
+                    datasets: []
+                };
+
+                // 8 distinct colors for all 8 products
+                const colors = [
+                    { border: '#667eea', background: 'rgba(102, 126, 234, 0.1)' },  // Blue - MacBook
+                    { border: '#10b981', background: 'rgba(16, 185, 129, 0.1)' },   // Green - iPad
+                    { border: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' },   // Yellow - Galaxy
+                    { border: '#ef4444', background: 'rgba(239, 68, 68, 0.1)' },    // Red - XPS
+                    { border: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' },   // Purple - Sony TV
+                    { border: '#06b6d4', background: 'rgba(6, 182, 212, 0.1)' },    // Cyan - AirPods
+                    { border: '#f97316', background: 'rgba(249, 115, 22, 0.1)' },   // Orange - Switch
+                    { border: '#ec4899', background: 'rgba(236, 72, 153, 0.1)' }    // Pink - Art Set
+                ];
+
+                // Create datasets for each product trend (all 8 products)
+                for (let i = 0; i < trends.length; i++) {
+                    const trend = trends[i];
+
+                    chartData.datasets.push({
+                        label: `${trend.productName} (${trend.priceChange.toFixed(1)}%)`,
+                        data: trend.dataPoints,
+                        borderColor: colors[i].border,
+                        backgroundColor: colors[i].background,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        borderWidth: 2
+                    });
+                }
+
+                const ctx = document.getElementById('priceChart').getContext('2d');
+
+                // Destroy existing chart if it exists
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Live Price Trends from Oracle Data'
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                onClick: (e, legendItem, legend) => {
+                                    const chart = legend.chart;
+                                    const datasetIndex = legendItem.datasetIndex;
+
+                                    // Check if any datasets are currently hidden
+                                    const anyHidden = chart.data.datasets.some((dataset, index) =>
+                                        index !== datasetIndex && !chart.isDatasetVisible(index)
+                                    );
+
+                                    if (anyHidden) {
+                                        // If some are hidden, show all
+                                        chart.data.datasets.forEach((dataset, index) => {
+                                            chart.setDatasetVisibility(index, true);
+                                        });
+                                        chartFilterState = null; // Clear filter state
+                                    } else {
+                                        // If all are visible, hide all except clicked one
+                                        chart.data.datasets.forEach((dataset, index) => {
+                                            chart.setDatasetVisibility(index, index === datasetIndex);
+                                        });
+                                        // Save filter state
+                                        chartFilterState = {
+                                            selectedIndex: datasetIndex,
+                                            selectedLabel: legendItem.text
+                                        };
+                                    }
+
+                                    chart.update();
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toFixed(0);
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+
+                // Restore previous filter state if it exists
+                if (chartFilterState && priceChart) {
+                    // Find the dataset with matching label
+                    const targetIndex = priceChart.data.datasets.findIndex(dataset =>
+                        dataset.label.includes(chartFilterState.selectedLabel.split(' (')[0])
+                    );
+
+                    if (targetIndex !== -1) {
+                        // Hide all except the previously selected one
+                        priceChart.data.datasets.forEach((dataset, index) => {
+                            priceChart.setDatasetVisibility(index, index === targetIndex);
+                        });
+                        priceChart.update();
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load price chart:', error);
+                // Fallback to simplified chart
+                createFallbackChart();
+            }
+        }
+
+        // Fallback chart with simple data
+        function createFallbackChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+
+            if (priceChart) {
+                priceChart.destroy();
+            }
+
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['30d ago', '15d ago', 'Today'],
+                    datasets: [{
+                        label: 'Price Trends',
+                        data: [100, 75, 50],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Price Trends (Loading...)'
+                        }
+                    }
+                }
+            });
+        }
+
+        // API call function for clickable endpoints
+        async function callAPI(endpoint, responseId) {
+            const responseArea = document.getElementById(`${responseId}-response`);
+            const responseElement = responseArea.querySelector('.api-response-content');
+
+            try {
+                // Show loading state
+                responseArea.style.display = 'block';
+                responseElement.innerHTML = 'Loading...';
+                responseElement.style.color = '#667eea';
+
+                // Scroll to response area
+                responseArea.scrollIntoView({ behavior: 'smooth' });
+
+                // Make API call
+                const response = await fetch(`${API_BASE}${endpoint}`);
+                const data = await response.json();
+
+                // Create status indicator
+                const statusInfo = `GET ${endpoint} - Status: ${response.status} ${response.ok ? '✅' : '❌'}\n\n`;
+
+                // Display formatted response
+                responseElement.innerHTML = statusInfo + JSON.stringify(data, null, 2);
+                responseElement.style.color = response.ok ? '#059669' : '#dc2626';
+
+            } catch (error) {
+                responseElement.innerHTML = `Error: ${error.message}`;
+                responseElement.style.color = '#dc2626';
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
    
 </body>
 </html>
